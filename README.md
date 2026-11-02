@@ -14,14 +14,14 @@ Edit video **on the beat of your song** — right in your browser. Add your clip
 
 ## Style presets
 
-- **Funk Dhamaaka** — fast cuts on every beat, glitch slices and shake on the drop, zoom punches.
+- **Funk Blast** — fast cuts on every beat, glitch slices and shake on the drop, zoom punches.
 - **Lyrics King** — slower cuts so the words can breathe; built for lyric videos.
 - **Dreamy Romantic** — slow zooms, soft colour, hearts and flowers floating on strong beats.
 - **Cinematic** — heavy grade, slow push-ins, trailer feel.
 
 ## Text styles
 
-Type your lyric lines (Hinglish works fine) and pick how they appear:
+Type your lyric lines (any language works fine) and pick how they appear:
 
 - **Word by word — big pop** with a yellow-orange gradient
 - **Word cards — red on black**, one word at a time between shots
