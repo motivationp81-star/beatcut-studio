@@ -40,25 +40,27 @@
   #btnExport { width: 100%; padding: 16px; border: none; border-radius: 12px; background: #ff4d5e; color: #fff; font-size: 17px; font-weight: 800; cursor: pointer; margin-top: 14px; }
   #btnExport:disabled { opacity: .45; }
   footer { color: #5d6580; font-size: 12.5px; text-align: center; margin-top: 22px; }
-  /* ── PC / badi screen ka layout — editor jaisa: preview baayein, panels daayein, timeline poori chaudi ── */
+  /* ── PC layout — pro editor jaisa (Premiere/FilmCraft andaaz): upar bar, baayein media bin, beech me Program preview, daayein properties/effects, neeche poori chaudi timeline ── */
   @media (min-width: 1024px) {
-    .wrap { max-width: 1480px; padding: 18px 22px 50px; display: grid; grid-template-columns: 470px 1fr 1fr; column-gap: 16px; align-items: start; }
-    header { grid-column: 1 / -1; text-align: left; padding-left: 4px; }
-    h1 { font-size: 28px; }
-    .stageCard { grid-column: 1; grid-row: 2 / span 6; position: sticky; top: 14px; margin-top: 0; }
-    canvas#stage { max-width: 400px; }
-    .card { margin-top: 0; margin-bottom: 14px; }
-    .cardMedia { grid-column: 2; grid-row: 2; }
+    body { background: #08090d; }
+    .wrap { max-width: 1560px; padding: 0 14px 40px; display: grid; grid-template-columns: 320px minmax(0, 1fr) 370px; column-gap: 12px; align-items: start; }
+    header { grid-column: 1 / -1; display: flex; align-items: baseline; gap: 16px; text-align: left; padding: 12px 6px; border-bottom: 1px solid #232b42; margin-bottom: 12px; }
+    h1 { font-size: 22px; }
+    .tag { margin: 0; }
+    .stageCard { grid-column: 2; grid-row: 2; position: static; margin-top: 0; background: #10141f; }
+    canvas#stage { max-width: 380px; }
+    .card { margin-top: 0; margin-bottom: 12px; background: #10141f; }
+    .cardMedia { grid-column: 1; grid-row: 2 / span 3; }
     .cardStyle { grid-column: 3; grid-row: 2; }
-    #btnAuto { grid-column: 2 / -1; grid-row: 3; margin-top: 0; margin-bottom: 14px; padding: 16px; font-size: 17px; }
-    .cardTl { grid-column: 2 / -1; grid-row: 4; }
-    #timeline { height: 64px; }
-    .cardText { grid-column: 2; grid-row: 5; }
-    .cardPro { grid-column: 3; grid-row: 5; }
-    #btnExport { grid-column: 2 / -1; grid-row: 6; margin-top: 0; }
-    .wrap > p.hint { grid-column: 2 / -1; grid-row: 7; }
+    .cardText { grid-column: 3; grid-row: 3; }
+    .cardPro { grid-column: 3; grid-row: 4; }
+    #btnAuto { grid-column: 2; grid-row: 3; margin-top: 0; padding: 15px; font-size: 16px; }
+    #btnExport { grid-column: 2; grid-row: 4; margin-top: 0; }
+    .cardTl { grid-column: 1 / -1; grid-row: 5; }
+    .cardTl select { max-width: 560px; }
+    #timeline { height: 96px; }
+    .wrap > p.hint { grid-column: 1 / -1; grid-row: 6; }
     footer { grid-column: 1 / -1; }
-    .checks { grid-template-columns: 1fr 1fr; }
   }
 </style>
 </head>
