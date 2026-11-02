@@ -259,7 +259,8 @@ function buildTimeline() {
   }
   const lines = $("lyrics").value.split("\n").map(x => x.trim()).filter(Boolean);
   S.wordTimes = []; S.lineTimes = [];
-  const pool = inRange.filter(b => b.s > 0.35); const use = pool.length >= 4 ? pool : inRange;
+  const tStart = $("hookText").value.trim() ? S.t0 + 2.0 : S.t0;
+  const pool = inRange.filter(b => b.t >= tStart && b.s > 0.35); const use = pool.length >= 4 ? pool : inRange.filter(b => b.t >= tStart);
   let bi = 0;
   lines.forEach(line => {
     if (bi < use.length) S.lineTimes.push({ line, t: use[bi].t });
@@ -268,9 +269,10 @@ function buildTimeline() {
   S.lastBeatIdx = -1; S.lastSegIdx = -1; S.particles = [];
   drawTimelineStrip();
 }
-function tlSignature() { return $("lyrics").value + "|" + S.t0 + "-" + S.t1 + "|" + $("cutRate").value + "|" + S.preset + "|" + S.beats.length; }
+function tlSignature() { return $("lyrics").value + "|" + $("hookText").value + "|" + S.t0 + "-" + S.t1 + "|" + $("cutRate").value + "|" + S.preset + "|" + S.beats.length; }
 function ensureTimeline() { const sig = tlSignature(); if (sig !== S.tlSig) { S.tlSig = sig; buildTimeline(); } }
 $("lyrics").addEventListener("input", () => { if (S.songBuf) ensureTimeline(); });
+$("hookText").addEventListener("input", () => { if (S.songBuf) ensureTimeline(); });
 function drawTimelineStrip() {
   const c = $("timeline"), g = c.getContext("2d");
   const tw = c.width, th = c.height, span = Math.max(0.01, S.t1 - S.t0);
@@ -466,6 +468,7 @@ function drawText(t) {
   }
   const wd = currentOf(S.wordTimes, t, 0.6); if (!wd) { ctx.restore(); return; }
   const age = t - wd.t, word = wd.word.toUpperCase();
+  if (style !== "wordcards" && age > (wd.end - wd.t) + 0.3) { ctx.restore(); return; }
   if (style === "wordcards") {
     if (age < 0.42) {
       ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
