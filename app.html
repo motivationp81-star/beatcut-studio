@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BeatCut Studio — V2 Engine + Timeline Editor</title>
+<style>
+  body { background:#14161c; color:#e8eaf0; font-family:system-ui,sans-serif; margin:16px; }
+  h1 { font-size:19px; margin:4px 0 2px; } p.sub { color:#9aa3b5; font-size:13px; margin:0 0 10px; }
+  label { display:block; margin:10px 0 4px; font-size:13px; color:#c6ccda; }
+  input[type=text], textarea, select { padding:7px; border-radius:6px; border:1px solid #3a3f4d; background:#0c0e12; color:#e8eaf0; }
+  button { background:#2a2f3d; color:#e8eaf0; border:1px solid #3a3f4d; padding:8px 13px; font-weight:600; border-radius:7px; cursor:pointer; margin:2px; font-size:13px; }
+  button.primary { background:#ffd23e; color:#14161c; border:0; }
+  button:disabled { opacity:.45; cursor:default; }
+  .row { display:flex; flex-wrap:wrap; gap:14px; align-items:flex-start; }
+  #previewBox { background:#000; border-radius:10px; padding:8px; }
+  video { width:270px; height:480px; background:#000; border-radius:6px; display:block; }
+  #timelineWrap { margin-top:14px; background:#0c0e12; border:1px solid #262b38; border-radius:10px; padding:10px; }
+  #ruler { position:relative; height:16px; color:#8b93a5; font-size:10px; cursor:pointer; }
+  #track { position:relative; height:64px; background:#171a21; border-radius:6px; overflow:hidden; cursor:pointer; }
+  .seg { position:absolute; top:6px; height:52px; border-radius:5px; border:1px solid rgba(255,255,255,.25); box-sizing:border-box; font-size:10px; padding:3px 4px; overflow:hidden; color:#0e0f13; font-weight:700; }
+  .seg.sel { outline:2px solid #ffd23e; outline-offset:-1px; }
+  .seg small { display:block; font-weight:500; }
+  #playhead { position:absolute; top:0; bottom:0; width:2px; background:#ff4757; pointer-events:none; }
+  #status { background:#0c0e12; padding:10px; border-radius:8px; white-space:pre-wrap; min-height:74px; margin-top:12px; font-size:12.5px; border:1px solid #262b38; }
+  #segInfo { font-size:13px; color:#c6ccda; min-height:18px; margin-top:8px; }
+  a { color:#ffd23e; font-weight:700; }
+</style>
+</head>
+<body>
+<h1>BeatCut Studio — Timeline Editor (V2 frame-exact engine)</h1>
+<p class="sub">Load clips + a song, the beat edit is built for you — then adjust it by hand on the timeline: select a part, split, delete, change speed. RENDER exports every frame exactly (30 fps, none dropped).</p>
+
+<div class="row">
+  <div>
+    <label>Video clips (1-4) <input type="file" id="clipFiles" accept="video/*" multiple></label>
+    <label>Song <input type="file" id="songFile" accept="audio/*"></label>
+    <label>Hook text <input type="text" id="hookText" value="O FIRKI WALI"></label>
+    <label>Lyrics — one line per line (can be empty)</label>
+    <textarea id="lyrics" rows="3" cols="34"></textarea>
+    <label>Video size
+      <select id="sizeSel">
+        <option value="720x1280" selected>9:16 (720x1280)</option>
+        <option value="720x900">4:5 (720x900)</option>
+        <option value="720x720">1:1 (720x720)</option>
+        <option value="1280x720">16:9 (1280x720)</option>
+      </select>
+    </label>
+    <br>
+    <button id="analyse" class="primary">ANALYSE + BUILD EDIT</button>
+    <button id="render" class="primary" disabled>RENDER MP4</button>
+    <p id="result"></p>
+  </div>
+  <div id="previewBox">
+    <video id="preview" playsinline muted></video>
+    <div style="margin-top:6px;">
+      <button id="playBtn">▶ Play preview</button>
+      <span id="clock" style="font-size:12.5px;color:#9aa3b5;">0.0s / 0.0s</span>
+    </div>
+    <p style="font-size:11.5px;color:#8b93a5;max-width:270px;margin:6px 0 0;">Preview is approximate (no zoom punch). The rendered MP4 is frame-exact.</p>
+  </div>
+</div>
+
+<div id="timelineWrap">
+  <div id="ruler"></div>
+  <div id="track"><div id="playhead" style="left:0"></div></div>
+  <div id="segInfo">No edit yet — load clips + song and press ANALYSE.</div>
+  <div>
+    <button id="splitBtn" disabled>✂ Split at playhead</button>
+    <button id="delBtn" disabled>🗑 Delete part</button>
+    <button id="leftBtn" disabled>◀ Move left</button>
+    <button id="rightBtn" disabled>Move right ▶</button>
+    <span style="margin-left:8px;font-size:12.5px;">Speed:</span>
+    <button class="spd" data-r="0.5" disabled>0.5x</button>
+    <button class="spd" data-r="1" disabled>1x</button>
+    <button class="spd" data-r="1.5" disabled>1.5x</button>
+    <button class="spd" data-r="2" disabled>2x</button>
+    <span style="margin-left:8px;font-size:12.5px;">Zoom punch:</span>
+    <button id="punchBtn" disabled>On</button>
+  </div>
+</div>
+
+<div id="status">Waiting…</div>
+
+<script type="module">
+import * as MB from "https://cdn.jsdelivr.net/npm/mediabunny@1.65.0/+esm";
+
+const el = (id) => document.getElementById(id);
+const statusEl = el("status");
+const say = (m) => { statusEl.textContent += "\n" + m; };
+statusEl.textContent = "Engine: " + (MB.Input ? "mediabunny OK" : "FAILED");
+
+/* ================= beat analysis v2 (3-band flux + tempo fold + snapped grid) ================= */
+async function renderBand(buf, makeFilter) {
+  const sr = buf.sampleRate;
+  const off = new OfflineAudioContext(1, buf.length, sr);
+  const src = off.createBufferSource(); src.buffer = buf;
+  makeFilter(off, src).connect(off.destination);
+  src.start();
+  return (await off.startRendering()).getChannelData(0);
+}
+function bandFlux(samples, hop) {
+  const n = Math.floor(samples.length / hop);
+  const rms = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    let s = 0; const st = i * hop;
+    for (let j = 0; j < hop; j++) { const v = samples[st + j]; s += v * v; }
+    rms[i] = Math.sqrt(s / hop + 1e-12);
+  }
+  const flux = new Float32Array(n);
+  for (let i = 1; i < n; i++) flux[i] = Math.max(0, rms[i] - rms[i - 1]);
+  const sorted = [...flux].sort((a, b) => a - b);
+  const p99 = sorted[Math.floor(sorted.length * 0.99)] || 1;
+  for (let i = 0; i < n; i++) flux[i] = Math.min(2, flux[i] / Math.max(p99, 1e-9));
+  return flux;
+}
+async function analyseBeats(buf) {
+  const sr = buf.sampleRate, hop = 256, fps = sr / hop;
+  const [low, mid, high] = await Promise.all([
+    renderBand(buf, (off, src) => { const f = off.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = 160; src.connect(f); return f; }),
+    renderBand(buf, (off, src) => { const f = off.createBiquadFilter(); f.type = "bandpass"; f.frequency.value = 1200; f.Q.value = 0.6; src.connect(f); return f; }),
+    renderBand(buf, (off, src) => { const f = off.createBiquadFilter(); f.type = "highpass"; f.frequency.value = 4000; src.connect(f); return f; }),
+  ]);
+  const fl = bandFlux(low, hop), fm = bandFlux(mid, hop), fh = bandFlux(high, hop);
+  const n = Math.min(fl.length, fm.length, fh.length);
+  const env = new Float32Array(n);
+  let envMax = 0.0001;
+  for (let i = 0; i < n; i++) { env[i] = fl[i] + 0.6 * fm[i] + 0.4 * fh[i]; if (env[i] > envMax) envMax = env[i]; }
+  for (let i = 0; i < n; i++) env[i] /= envMax;
+  const W = Math.floor(0.75 * fps), peaks = [];
+  const csum = new Float32Array(n + 1);
+  for (let i = 0; i < n; i++) csum[i + 1] = csum[i] + env[i];
+  const localMean = (i) => { const a = Math.max(0, i - W), b = Math.min(n, i + W + 1); return (csum[b] - csum[a]) / (b - a); };
+  let last = -1e9;
+  for (let i = 1; i < n - 1; i++) {
+    if (env[i] > localMean(i) * 1.3 + 0.05 && env[i] >= env[i - 1] && env[i] >= env[i + 1] && i - last >= 0.24 * fps) {
+      peaks.push({ i, t: i / fps, s: env[i] }); last = i;
+    }
+  }
+  if (peaks.length < 6) return { beats: peaks.map(p => ({ t: p.t, s: Math.min(1, p.s) })), bpm: 0 };
+  const iois = []; for (let i = 1; i < peaks.length; i++) iois.push(peaks[i].t - peaks[i - 1].t);
+  iois.sort((a, b) => a - b);
+  let P = iois[Math.floor(iois.length / 2)];
+  while (P < 0.35) P *= 2;
+  while (P > 0.75) P /= 2;
+  const bpm = Math.round(60 / P);
+  const dur = n / fps;
+  let bestOff = 0, bestVal = -1;
+  for (let off = 0; off < P; off += 1 / fps) {
+    let sum = 0, cnt = 0;
+    for (let t = off; t < dur; t += P) { sum += env[Math.min(n - 1, Math.round(t * fps))]; cnt++; }
+    if (cnt && sum / cnt > bestVal) { bestVal = sum / cnt; bestOff = off; }
+  }
+  const beats = [];
+  for (let t = bestOff; t < dur; t += P) {
+    let snap = null;
+    for (const p of peaks) { if (Math.abs(p.t - t) <= 0.11 && (!snap || p.s > snap.s)) snap = p; }
+    if (snap) beats.push({ t: snap.t, s: Math.min(1, snap.s) });
+    else beats.push({ t, s: Math.min(0.2, env[Math.min(n - 1, Math.round(t * fps))]) });
+  }
+  return { beats, bpm };
+}
+
+async function pickAudioCodec(chCount, sr) {
+  for (const [name, full] of [["aac", "mp4a.40.2"], ["opus", "opus"]]) {
+    try {
+      const sup = await AudioEncoder.isConfigSupported({ codec: full, sampleRate: sr, numberOfChannels: chCount, bitrate: 128000 });
+      if (sup.supported) return name;
+    } catch (e) { /* next */ }
+  }
+  return null;
+}
+
+/* ================= state + timeline ================= */
+const S = { clipFiles: [], clipURLs: [], clipDur: [], songBuf: null, beats: [], bpm: 0, DUR: 0, segments: [], sel: -1, playhead: 0, playing: false };
+const COL = ["#ffd23e", "#7ee0a3", "#6ec3ff", "#ff9de2"];
+
+function relayout() {
+  // recompute per-clip source cursors so playback stays continuous after edits
+  const cur = S.clipFiles.map(() => 0);
+  for (const sg of S.segments) { sg.srcStart = cur[sg.clipIdx]; cur[sg.clipIdx] += (sg.end - sg.start) * sg.rate; }
+}
+function buildSegments() {
+  const inRange = S.beats.filter(b => b.t < S.DUR);
+  const cutTimes = [0];
+  let since = 0, lastCut = 0;
+  inRange.forEach(b => {
+    since++;
+    const strong = b.s > 0.75, weak = b.s < 0.22;
+    if ((since >= 1 && !weak) || (strong && since >= 1 && b.t - lastCut > 0.3) || (since >= 2)) {
+      if (b.t - lastCut > 0.42) { cutTimes.push(b.t); lastCut = b.t; since = 0; }
+    }
+  });
+  cutTimes.push(S.DUR);
+  S.segments = [];
+  for (let i = 0; i < cutTimes.length - 1; i++) {
+    const start = cutTimes[i], end = cutTimes[i + 1];
+    const beat = inRange.find(b => Math.abs(b.t - start) < 0.06);
+    S.segments.push({ start, end, clipIdx: i % Math.max(1, S.clipFiles.length), srcStart: 0, rate: 1, strong: beat ? beat.s : 0.4, punch: true });
+  }
+  relayout();
+  S.sel = S.segments.length ? 0 : -1;
+}
+function drawTimeline() {
+  const track = el("track");
+  track.querySelectorAll(".seg").forEach(n => n.remove());
+  const ruler = el("ruler"); ruler.innerHTML = "";
+  if (!S.DUR) return;
+  for (let t = 0; t <= S.DUR; t += 5) {
+    const d = document.createElement("span");
+    d.style.cssText = "position:absolute;left:" + (t / S.DUR * 100) + "%";
+    d.textContent = t + "s"; ruler.appendChild(d);
+  }
+  S.segments.forEach((sg, i) => {
+    const d = document.createElement("div");
+    d.className = "seg" + (i === S.sel ? " sel" : "");
+    d.style.left = (sg.start / S.DUR * 100) + "%";
+    d.style.width = Math.max(0.8, (sg.end - sg.start) / S.DUR * 100) + "%";
+    d.style.background = COL[sg.clipIdx % COL.length];
+    d.innerHTML = "Clip " + (sg.clipIdx + 1) + "<small>" + (sg.end - sg.start).toFixed(1) + "s" + (sg.rate !== 1 ? " · " + sg.rate + "x" : "") + (sg.punch ? "" : " · no punch") + "</small>";
+    d.addEventListener("click", (ev) => { ev.stopPropagation(); select(i); S.playhead = sg.start; drawPlayhead(); });
+    track.appendChild(d);
+  });
+  drawPlayhead();
+  updateSegInfo();
+}
+function drawPlayhead() {
+  el("playhead").style.left = S.DUR ? (S.playhead / S.DUR * 100) + "%" : "0";
+  el("clock").textContent = S.playhead.toFixed(1) + "s / " + S.DUR.toFixed(1) + "s";
+}
+function updateSegInfo() {
+  const info = el("segInfo");
+  const on = S.sel >= 0 && S.segments[S.sel];
+  ["splitBtn", "delBtn", "leftBtn", "rightBtn", "punchBtn"].forEach(id => el(id).disabled = !on);
+  document.querySelectorAll(".spd").forEach(b => b.disabled = !on);
+  if (!on) { info.textContent = S.segments.length ? S.segments.length + " parts — click a part to select it." : "No edit yet."; return; }
+  const sg = S.segments[S.sel];
+  el("punchBtn").textContent = sg.punch ? "On" : "Off";
+  info.textContent = "Part " + (S.sel + 1) + " of " + S.segments.length + " · Clip " + (sg.clipIdx + 1) + " · " + sg.start.toFixed(2) + "s → " + sg.end.toFixed(2) + "s · speed " + sg.rate + "x · punch " + (sg.punch ? "on" : "off");
+}
+function select(i) { S.sel = i; drawTimeline(); }
+el("track").addEventListener("click", (ev) => {
+  if (!S.DUR) return;
+  const r = el("track").getBoundingClientRect();
+  S.playhead = Math.min(S.DUR, Math.max(0, (ev.clientX - r.left) / r.width * S.DUR));
+  drawPlayhead();
+});
+el("splitBtn").addEventListener("click", () => {
+  const i = S.segments.findIndex(sg => S.playhead > sg.start + 0.1 && S.playhead < sg.end - 0.1);
+  if (i < 0) { say("Playhead is not inside a part — click the timeline to place it inside a part first."); return; }
+  const sg = S.segments[i];
+  const a = { ...sg, end: S.playhead }, b = { ...sg, start: S.playhead };
+  S.segments.splice(i, 1, a, b);
+  relayout(); S.sel = i; drawTimeline();
+  say("Split part " + (i + 1) + " → now " + S.segments.length + " parts.");
+});
+el("delBtn").addEventListener("click", () => {
+  if (S.sel < 0 || S.segments.length <= 1) return;
+  const gone = S.segments.splice(S.sel, 1)[0];
+  // stretch the previous part over the gap so the timeline stays full-length
+  if (S.sel > 0) S.segments[S.sel - 1].end = gone.end;
+  else if (S.segments[0]) S.segments[0].start = gone.start;
+  S.sel = Math.min(S.sel, S.segments.length - 1);
+  relayout(); drawTimeline();
+  say("Deleted a part → " + S.segments.length + " parts left.");
+});
+el("leftBtn").addEventListener("click", () => { if (S.sel > 0) { const [s] = S.segments.splice(S.sel, 1); S.segments.splice(S.sel - 1, 0, s); S.sel--; relayout(); drawTimeline(); } });
+el("rightBtn").addEventListener("click", () => { if (S.sel >= 0 && S.sel < S.segments.length - 1) { const [s] = S.segments.splice(S.sel, 1); S.segments.splice(S.sel + 1, 0, s); S.sel++; relayout(); drawTimeline(); } });
+document.querySelectorAll(".spd").forEach(b => b.addEventListener("click", () => {
+  if (S.sel < 0) return;
+  S.segments[S.sel].rate = parseFloat(b.dataset.r);
+  relayout(); drawTimeline();
+}));
+el("punchBtn").addEventListener("click", () => { if (S.sel >= 0) { S.segments[S.sel].punch = !S.segments[S.sel].punch; drawTimeline(); } });
+
+/* ================= preview (approximate) ================= */
+const vid = el("preview");
+function segAt(t) { return S.segments.findIndex(sg => t >= sg.start && t < sg.end); }
+function previewTick() {
+  if (!S.playing) return;
+  const i = segAt(S.playhead);
+  if (i < 0) { stopPreview(); return; }
+  const sg = S.segments[i];
+  const want = S.clipURLs[sg.clipIdx];
+  if (vid.dataset.clip !== String(sg.clipIdx)) {
+    vid.dataset.clip = String(sg.clipIdx);
+    vid.src = want;
+    vid.currentTime = sg.srcStart + (S.playhead - sg.start) * sg.rate;
+    vid.playbackRate = sg.rate;
+    vid.play().catch(() => {});
+  } else {
+    S.playhead = sg.start + (vid.currentTime - sg.srcStart) / sg.rate;
+    if (S.playhead >= sg.end - 0.03) { S.playhead = sg.end; vid.dataset.clip = ""; }
+  }
+  drawPlayhead();
+  requestAnimationFrame(previewTick);
+}
+function stopPreview() { S.playing = false; vid.pause(); el("playBtn").textContent = "▶ Play preview"; }
+el("playBtn").addEventListener("click", () => {
+  if (!S.segments.length) return;
+  if (S.playing) { stopPreview(); return; }
+  if (S.playhead >= S.DUR - 0.05) S.playhead = 0;
+  S.playing = true; vid.dataset.clip = ""; el("playBtn").textContent = "⏸ Pause";
+  previewTick();
+});
+
+/* ================= analyse ================= */
+el("analyse").addEventListener("click", async () => {
+  const clipFiles = [...el("clipFiles").files];
+  const songF = el("songFile").files[0];
+  if (!clipFiles.length || !songF) { say("Pick clips and a song first."); return; }
+  try {
+    say("Decoding song + analysing beats…");
+    const actx = new AudioContext({ sampleRate: 48000 });
+    S.songBuf = await actx.decodeAudioData(await songF.arrayBuffer());
+    S.DUR = Math.min(40, S.songBuf.duration);
+    const { beats, bpm } = await analyseBeats(S.songBuf);
+    S.beats = beats; S.bpm = bpm;
+    say("Beats: " + beats.length + " · ~" + bpm + " BPM · edit length " + S.DUR.toFixed(1) + "s");
+    S.clipFiles = clipFiles;
+    S.clipURLs = clipFiles.map(f => URL.createObjectURL(f));
+    S.clipDur = [];
+    for (const f of clipFiles) {
+      const input = new MB.Input({ source: new MB.BlobSource(f), formats: MB.ALL_FORMATS });
+      S.clipDur.push(await input.computeDuration());
+    }
+    buildSegments();
+    S.playhead = 0;
+    drawTimeline();
+    el("render").disabled = false;
+    say("Segments: " + S.segments.length + " across " + clipFiles.length + " clip(s). Adjust on the timeline if you want, then RENDER MP4.");
+  } catch (e) { say("ERROR: " + (e && e.message ? e.message : e)); console.error(e); }
+});
+
+/* ================= render (frame-exact, honours timeline edits) ================= */
+el("render").addEventListener("click", async () => {
+  if (!S.segments.length || !S.songBuf) return;
+  const started = performance.now();
+  try {
+    const [W, H] = el("sizeSel").value.split("x").map(Number);
+    const FPS = 30, DUR = S.DUR;
+    const inRange = S.beats.filter(b => b.t < DUR);
+    /* word timings from beats */
+    const hook = el("hookText").value.trim();
+    const lines = el("lyrics").value.split("\n").map(x => x.trim()).filter(Boolean);
+    const wordTimes = [];
+    {
+      const t0 = hook ? 1.6 : 0;
+      const pool = inRange.filter(b => b.t >= t0 && b.s > 0.3);
+      let bi = 0;
+      lines.forEach(line => line.split(/\s+/).filter(Boolean).forEach(w => { if (bi < pool.length) wordTimes.push({ word: w, t: pool[bi++].t }); }));
+    }
+    const clipData = [];
+    for (const f of S.clipFiles) {
+      const input = new MB.Input({ source: new MB.BlobSource(f), formats: MB.ALL_FORMATS });
+      const track = await input.getPrimaryVideoTrack();
+      clipData.push({ input, track, sink: new MB.VideoSampleSink(track), dur: await input.computeDuration() });
+    }
+    const segs = S.segments.map(sg => ({ ...sg }));
+    segs.forEach(sg => { const d = clipData[sg.clipIdx].dur; if (d > 1 && sg.srcStart > d - 0.2) sg.srcStart = Math.max(0, sg.srcStart % Math.max(1, d - (sg.end - sg.start) * sg.rate - 0.05)); });
+    const audioCodec = await pickAudioCodec(Math.min(2, S.songBuf.numberOfChannels), 48000);
+    say("Audio encoder: " + (audioCodec ? audioCodec.toUpperCase() : "none (video-only)"));
+    const canvas = new OffscreenCanvas(W, H);
+    const ctx = canvas.getContext("2d");
+    const target = new MB.BufferTarget();
+    const output = new MB.Output({ format: new MB.Mp4OutputFormat(), target });
+    const vSrc = new MB.CanvasSource(canvas, { codec: "avc", bitrate: 8_000_000 });
+    output.addVideoTrack(vSrc);
+    let aSrc = null;
+    if (audioCodec) { aSrc = new MB.AudioBufferSource({ codec: audioCodec, bitrate: 128_000 }); output.addAudioTrack(aSrc); }
+    await output.start();
+    if (aSrc) {
+      const sr = S.songBuf.sampleRate, len = Math.floor(DUR * sr);
+      const sub = new AudioBuffer({ numberOfChannels: S.songBuf.numberOfChannels, length: len, sampleRate: sr });
+      for (let c = 0; c < S.songBuf.numberOfChannels; c++) sub.getChannelData(c).set(S.songBuf.getChannelData(c).subarray(0, len));
+      await aSrc.add(sub);
+    }
+    const totalFrames = Math.floor(DUR * FPS);
+    let frame = 0;
+    for (const sg of segs) {
+      const cd = clipData[sg.clipIdx];
+      const srcEnd = Math.min(cd.dur, sg.srcStart + (sg.end - sg.start) * sg.rate + 0.1);
+      const iter = cd.sink.samples(sg.srcStart, srcEnd)[Symbol.asyncIterator]();
+      let cur = (await iter.next()).value || null;
+      const segFrames = Math.max(1, Math.round((sg.end - sg.start) * FPS));
+      for (let k = 0; k < segFrames && frame < totalFrames; k++, frame++) {
+        const t = frame / FPS;
+        const srcT = sg.srcStart + (t - sg.start) * sg.rate;
+        while (cur && cur.timestamp + cur.duration <= srcT + 0.001) { const nx = (await iter.next()).value || null; cur.close(); cur = nx; }
+        ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
+        if (cur) {
+          const age = t - sg.start;
+          const punchAmt = sg.punch ? (sg.strong > 0.72 ? Math.max(0, 1 - age / 0.28) : Math.max(0, 1 - age / 0.5) * 0.5) : 0;
+          const z = 1 + 0.16 * punchAmt + 0.02 * Math.sin(Math.min(1, age / Math.max(0.2, sg.end - sg.start)) * Math.PI);
+          ctx.save();
+          ctx.filter = "contrast(1.07) saturate(1.07)";
+          // cover-fit draw for any source aspect
+          const sw = cur.displayWidth || cur.codedWidth, sh = cur.displayHeight || cur.codedHeight;
+          const scale = Math.max(W / sw, H / sh) * z;
+          const dw = sw * scale, dh = sh * scale;
+          cur.draw(ctx, (W - dw) / 2, (H - dh) / 2, dw, dh);
+          ctx.restore();
+          ctx.filter = "none";
+        }
+        ctx.save(); ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        if (hook && t < 1.6) {
+          const a = t < 0.2 ? t / 0.2 : (t > 1.35 ? Math.max(0, (1.6 - t) / 0.25) : 1);
+          ctx.globalAlpha = a;
+          ctx.font = "900 " + Math.round(W * 0.128) + "px system-ui, 'Arial Black', sans-serif";
+          ctx.lineWidth = 12; ctx.strokeStyle = "rgba(0,0,0,0.9)"; ctx.lineJoin = "round";
+          ctx.fillStyle = "rgba(0,0,0,0.38)"; ctx.fillRect(10, H * 0.4 - W * 0.108, W - 20, W * 0.216);
+          ctx.strokeText(hook.toUpperCase(), W / 2, H * 0.4);
+          ctx.fillStyle = "#ffd23e"; ctx.fillText(hook.toUpperCase(), W / 2, H * 0.4);
+        } else {
+          let wd = null;
+          for (const w of wordTimes) { if (w.t <= t) wd = w; else break; }
+          if (wd && t - wd.t < 0.6) {
+            const age = t - wd.t, sc = age < 0.09 ? 0.6 + 0.4 * (age / 0.09) : 1;
+            ctx.translate(W / 2, H * 0.52); ctx.scale(sc, sc);
+            ctx.font = "900 " + Math.round(W * 0.133) + "px system-ui, 'Arial Black', sans-serif";
+            ctx.lineWidth = 13; ctx.strokeStyle = "rgba(0,0,0,0.92)"; ctx.lineJoin = "round";
+            ctx.strokeText(wd.word.toUpperCase(), 0, 0);
+            ctx.fillStyle = "#ffffff"; ctx.fillText(wd.word.toUpperCase(), 0, 0);
+          }
+        }
+        ctx.restore();
+        await vSrc.add(t, 1 / FPS);
+        if (frame % 150 === 0) say("  frame " + frame + " / " + totalFrames);
+      }
+      if (cur) cur.close();
+    }
+    await output.finalize();
+    const secs = ((performance.now() - started) / 1000).toFixed(1);
+    const blob = new Blob([target.buffer], { type: "video/mp4" });
+    const url = URL.createObjectURL(blob);
+    say("DONE in " + secs + "s — " + totalFrames + " frames, " + segs.length + " segments. MP4: " + (blob.size / 1048576).toFixed(2) + " MB");
+    el("result").innerHTML = '<a href="' + url + '" download="beatcut-edit.mp4">⬇ Download the edited MP4</a>';
+  } catch (e) { say("ERROR: " + (e && e.message ? e.message : e)); console.error(e); }
+});
+</script>
+</body>
+</html>
