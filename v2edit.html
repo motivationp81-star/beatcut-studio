@@ -33,36 +33,82 @@ const statusEl = el("status");
 const say = (m) => { statusEl.textContent += "\n" + m; };
 statusEl.textContent = "Engine: " + (MB.Input ? "mediabunny OK" : "FAILED");
 
-/* ---------- beat analysis (same family as the main tool) ---------- */
-async function analyseBeats(buf) {
-  const sr = buf.sampleRate, ch = buf.getChannelData(0);
-  const off = new OfflineAudioContext(1, ch.length, sr);
+/* ---------- beat analysis v2: 3-band energy flux + tempo folding + snapped beat grid ----------
+   The old single low-band energy test missed most hits on fast dhol songs (19 beats on a
+   ~100 BPM song). This version listens to low (dhol body), mid (snap) and high (shimmer)
+   bands, builds an onset envelope from positive energy flux, finds the true beat period
+   from onset spacing (folded into 0.35–0.75s), then lays a grid and snaps each grid beat
+   to the nearest real onset peak so cuts land exactly on hits, never late. */
+async function renderBand(buf, makeFilter) {
+  const sr = buf.sampleRate;
+  const off = new OfflineAudioContext(1, buf.length, sr);
   const src = off.createBufferSource(); src.buffer = buf;
-  const lp = off.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 160;
-  src.connect(lp); lp.connect(off.destination); src.start();
-  const low = (await off.startRendering()).getChannelData(0);
-  const hop = 512, win = 2048, n = Math.floor(low.length / hop);
-  const energy = new Float32Array(n);
+  makeFilter(off, src).connect(off.destination);
+  src.start();
+  return (await off.startRendering()).getChannelData(0);
+}
+function bandFlux(samples, hop) {
+  const n = Math.floor(samples.length / hop);
+  const rms = new Float32Array(n);
   for (let i = 0; i < n; i++) {
     let s = 0; const st = i * hop;
-    for (let j = 0; j < win && st + j < low.length; j += 16) s += low[st + j] * low[st + j];
-    energy[i] = s;
+    for (let j = 0; j < hop; j++) { const v = samples[st + j]; s += v * v; }
+    rms[i] = Math.sqrt(s / hop + 1e-12);
   }
-  const beats = [];
-  for (let i = 2; i < n - 2; i++) {
-    const avg = (energy[i - 2] + energy[i - 1] + energy[i + 1] + energy[i + 2]) / 4;
-    if (energy[i] > avg * 1.35 && energy[i] > 0.02) {
-      const t = (i * hop) / sr;
-      if (!beats.length || t - beats[beats.length - 1].t > 0.18) {
-        let mx = 0.0001; for (let k = Math.max(0, i - 8); k < Math.min(n, i + 8); k++) mx = Math.max(mx, energy[k]);
-        beats.push({ t, s: Math.min(1, energy[i] / mx) });
-      }
+  const flux = new Float32Array(n);
+  for (let i = 1; i < n; i++) flux[i] = Math.max(0, rms[i] - rms[i - 1]);
+  const sorted = [...flux].sort((a, b) => a - b);
+  const p99 = sorted[Math.floor(sorted.length * 0.99)] || 1;
+  for (let i = 0; i < n; i++) flux[i] = Math.min(2, flux[i] / Math.max(p99, 1e-9));
+  return flux;
+}
+async function analyseBeats(buf) {
+  const sr = buf.sampleRate, hop = 256, fps = sr / hop;
+  const [low, mid, high] = await Promise.all([
+    renderBand(buf, (off, src) => { const f = off.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = 160; src.connect(f); return f; }),
+    renderBand(buf, (off, src) => { const f = off.createBiquadFilter(); f.type = "bandpass"; f.frequency.value = 1200; f.Q.value = 0.6; src.connect(f); return f; }),
+    renderBand(buf, (off, src) => { const f = off.createBiquadFilter(); f.type = "highpass"; f.frequency.value = 4000; src.connect(f); return f; }),
+  ]);
+  const fl = bandFlux(low, hop), fm = bandFlux(mid, hop), fh = bandFlux(high, hop);
+  const n = Math.min(fl.length, fm.length, fh.length);
+  const env = new Float32Array(n);
+  let envMax = 0.0001;
+  for (let i = 0; i < n; i++) { env[i] = fl[i] + 0.6 * fm[i] + 0.4 * fh[i]; if (env[i] > envMax) envMax = env[i]; }
+  for (let i = 0; i < n; i++) env[i] /= envMax;
+  /* adaptive peak pick on the onset envelope */
+  const W = Math.floor(0.75 * fps), peaks = [];
+  let runSum = 0; const csum = new Float32Array(n + 1);
+  for (let i = 0; i < n; i++) { runSum += env[i]; csum[i + 1] = runSum; }
+  const localMean = (i) => { const a = Math.max(0, i - W), b = Math.min(n, i + W + 1); return (csum[b] - csum[a]) / (b - a); };
+  let last = -1e9;
+  for (let i = 1; i < n - 1; i++) {
+    if (env[i] > localMean(i) * 1.3 + 0.05 && env[i] >= env[i - 1] && env[i] >= env[i + 1] && i - last >= 0.24 * fps) {
+      peaks.push({ i, t: i / fps, s: env[i] }); last = i;
     }
   }
-  let bpm = 0;
-  if (beats.length > 2) {
-    const gaps = []; for (let i = 1; i < beats.length; i++) gaps.push(beats[i].t - beats[i - 1].t);
-    gaps.sort((a, b) => a - b); bpm = Math.round(60 / gaps[Math.floor(gaps.length / 2)]);
+  if (peaks.length < 6) return { beats: peaks.map(p => ({ t: p.t, s: Math.min(1, p.s) })), bpm: 0 };
+  /* tempo: median onset spacing, folded into the main-beat range 0.35–0.75s */
+  const iois = []; for (let i = 1; i < peaks.length; i++) iois.push(peaks[i].t - peaks[i - 1].t);
+  iois.sort((a, b) => a - b);
+  let P = iois[Math.floor(iois.length / 2)];
+  while (P < 0.35) P *= 2;
+  while (P > 0.75) P /= 2;
+  const bpm = Math.round(60 / P);
+  /* grid phase: offset that puts grid points on the strongest envelope */
+  const dur = n / fps;
+  let bestOff = 0, bestVal = -1;
+  for (let off = 0; off < P; off += 1 / fps) {
+    let sum = 0, cnt = 0;
+    for (let t = off; t < dur; t += P) { sum += env[Math.min(n - 1, Math.round(t * fps))]; cnt++; }
+    if (cnt && sum / cnt > bestVal) { bestVal = sum / cnt; bestOff = off; }
+  }
+  /* snap each grid beat to the nearest real onset peak within ±0.11s */
+  const beats = [];
+  for (let t = bestOff; t < dur; t += P) {
+    let snap = null;
+    for (const p of peaks) { if (Math.abs(p.t - t) <= 0.11 && (!snap || p.s > snap.s)) snap = p; }
+    if (snap) beats.push({ t: snap.t, s: Math.min(1, snap.s) });
+    else beats.push({ t, s: Math.min(0.2, env[Math.min(n - 1, Math.round(t * fps))]) });
   }
   return { beats, bpm };
 }
