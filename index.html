@@ -40,6 +40,26 @@
   #btnExport { width: 100%; padding: 16px; border: none; border-radius: 12px; background: #ff4d5e; color: #fff; font-size: 17px; font-weight: 800; cursor: pointer; margin-top: 14px; }
   #btnExport:disabled { opacity: .45; }
   footer { color: #5d6580; font-size: 12.5px; text-align: center; margin-top: 22px; }
+  /* ── PC / badi screen ka layout — editor jaisa: preview baayein, panels daayein, timeline poori chaudi ── */
+  @media (min-width: 1024px) {
+    .wrap { max-width: 1480px; padding: 18px 22px 50px; display: grid; grid-template-columns: 470px 1fr 1fr; column-gap: 16px; align-items: start; }
+    header { grid-column: 1 / -1; text-align: left; padding-left: 4px; }
+    h1 { font-size: 28px; }
+    .stageCard { grid-column: 1; grid-row: 2 / span 6; position: sticky; top: 14px; margin-top: 0; }
+    canvas#stage { max-width: 400px; }
+    .card { margin-top: 0; margin-bottom: 14px; }
+    .cardMedia { grid-column: 2; grid-row: 2; }
+    .cardStyle { grid-column: 3; grid-row: 2; }
+    #btnAuto { grid-column: 2 / -1; grid-row: 3; margin-top: 0; margin-bottom: 14px; padding: 16px; font-size: 17px; }
+    .cardTl { grid-column: 2 / -1; grid-row: 4; }
+    #timeline { height: 64px; }
+    .cardText { grid-column: 2; grid-row: 5; }
+    .cardPro { grid-column: 3; grid-row: 5; }
+    #btnExport { grid-column: 2 / -1; grid-row: 6; margin-top: 0; }
+    .wrap > p.hint { grid-column: 2 / -1; grid-row: 7; }
+    footer { grid-column: 1 / -1; }
+    .checks { grid-template-columns: 1fr 1fr; }
+  }
 </style>
 </head>
 <body>
@@ -59,7 +79,7 @@
     <div id="status">Pehle neeche apni clip/photo aur gaana add karo 👇</div>
   </div>
 
-  <div class="card">
+  <div class="card cardMedia">
     <h2>1 · Media add karo</h2>
     <label class="f">Video clips (ek ya zyada) — ya khali chhodo photo mode ke liye</label>
     <input type="file" id="fileClips" accept="video/*" multiple>
@@ -71,7 +91,7 @@
 
   <button id="btnAuto" disabled>⚡ AUTO EDIT — beat par kaato</button>
 
-  <div class="card">
+  <div class="card cardTl">
     <h2>2 · Timeline &amp; trim</h2>
     <canvas id="timeline" width="720" height="46"></canvas>
     <p class="hint">Upar wali patti = tumhara edit. Chhoti lakeerein = beat, bade hisse = cuts.</p>
@@ -87,7 +107,7 @@
     </select>
   </div>
 
-  <div class="card">
+  <div class="card cardStyle">
     <h2>3 · Style &amp; effects</h2>
     <div class="chips" id="presets">
       <button class="chip on" data-preset="funk">🔥 Funk Dhamaaka</button>
@@ -115,7 +135,7 @@
     </select>
   </div>
 
-  <div class="card">
+  <div class="card cardText">
     <h2>4 · Text / lyrics</h2>
     <label class="f">Shuruaat ka bada text (hook) — khali bhi chalega</label>
     <input type="text" id="hookText" placeholder="e.g. LADDO RANI 🔥">
@@ -135,7 +155,7 @@ udi udi jaaye"></textarea>
     <input type="text" id="watermark" placeholder="e.g. apne channel ka naam">
   </div>
 
-  <div class="card">
+  <div class="card cardPro">
     <h2>5 · Pro Edit — haath se control (After Effects style)</h2>
     <p class="hint">Ye slider turant preview me dikhte hain — apne hisaab se zor kam-zayada karo. 100% matlab normal.</p>
     <div class="rangeRow"><span>Zoom punch</span><input type="range" id="mZoom" min="0" max="200" value="100" step="5"><output id="mZoomVal">100%</output></div>
