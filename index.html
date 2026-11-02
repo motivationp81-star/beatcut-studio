@@ -268,6 +268,9 @@ function buildTimeline() {
   S.lastBeatIdx = -1; S.lastSegIdx = -1; S.particles = [];
   drawTimelineStrip();
 }
+function tlSignature() { return $("lyrics").value + "|" + S.t0 + "-" + S.t1 + "|" + $("cutRate").value + "|" + S.preset + "|" + S.beats.length; }
+function ensureTimeline() { const sig = tlSignature(); if (sig !== S.tlSig) { S.tlSig = sig; buildTimeline(); } }
+$("lyrics").addEventListener("input", () => { if (S.songBuf) ensureTimeline(); });
 function drawTimelineStrip() {
   const c = $("timeline"), g = c.getContext("2d");
   const tw = c.width, th = c.height, span = Math.max(0.01, S.t1 - S.t0);
@@ -513,6 +516,7 @@ function stopPlay() {
 }
 $("btnPlay").addEventListener("click", async () => {
   if (!S.songBuf) return;
+  ensureTimeline();
   if (S.playing) { stopPlay(); return; }
   if (songEl.currentTime < S.t0 || songEl.currentTime >= S.t1 - 0.05) { try { songEl.currentTime = S.t0; } catch(_){} }
   S.playing = true; S.errShown = false; $("btnPlay").textContent = "⏸";
@@ -524,7 +528,7 @@ songEl.addEventListener("ended", () => { if (!S.exporting) stopPlay(); });
 /* ---------------- auto edit ---------------- */
 $("btnAuto").addEventListener("click", () => {
   if (!S.songBuf) return;
-  buildTimeline();
+  ensureTimeline();
   setStatus("⚡ Auto Edit taiyaar — " + S.segments.length + " cuts beat par lag gaye. Play dabakar dekho!");
   window.scrollTo({ top: 0, behavior: "smooth" });
   if (!S.playing) $("btnPlay").click();
