@@ -1,0 +1,1087 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BeatCut Studio — CapCut-style beat editor</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: #0b0d13; color: #eef1f8; }
+  .wrap { max-width: 560px; margin: 0 auto; padding: 14px 12px 60px; }
+  header { text-align: center; padding: 8px 0 12px; }
+  h1 { font-size: 24px; margin: 0; } h1 .b { color: #ff4d5e; }
+  .tag { color: #98a2ba; font-size: 13.5px; margin: 5px 0 0; }
+  .stageCard { background: #131826; border: 1px solid #232b42; border-radius: 16px; padding: 12px; position: sticky; top: 54px; z-index: 5; }
+  canvas#stage { width: 100%; max-width: 330px; aspect-ratio: 9/16; display: block; margin: 0 auto; background: #000; border-radius: 12px; }
+  .transport { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+  #btnPlay { flex: 0 0 auto; width: 52px; height: 52px; border-radius: 50%; border: none; background: #ff4d5e; color: #fff; font-size: 21px; cursor: pointer; }
+  #btnPlay:disabled { background: #39415c; }
+  #timeLabel { font-size: 13px; color: #aeb7cf; font-variant-numeric: tabular-nums; }
+  #beatInfo { font-size: 13px; color: #8fd18a; margin-top: 8px; min-height: 17px; text-align: center; }
+  #status { font-size: 13px; color: #9aa3b8; margin-top: 3px; min-height: 17px; text-align: center; }
+  .card { background: #131826; border: 1px solid #232b42; border-radius: 16px; padding: 15px; margin-top: 14px; }
+  .card h2 { font-size: 15px; margin: 0 0 10px; color: #d5dbee; }
+  label.f { display: block; font-size: 13px; color: #9aa3b8; margin: 10px 0 5px; }
+  input[type=file] { width: 100%; background: #0e1220; border: 1px dashed #33405f; border-radius: 10px; padding: 10px; color: #c7cede; font-size: 13px; }
+  .chips { display: flex; gap: 7px; flex-wrap: wrap; }
+  .chip { padding: 9px 13px; border-radius: 999px; border: 1px solid #2c3550; background: #0e1220; color: #aeb7cf; cursor: pointer; font-size: 13.5px; font-weight: 600; }
+  .chip.on { background: #31406e; border-color: #5b7bd5; color: #fff; }
+  .checks { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; font-size: 13.5px; }
+  .checks label { display: flex; gap: 7px; align-items: center; cursor: pointer; color: #c7cede; }
+  textarea, select, input[type=text] { width: 100%; background: #0e1220; border: 1px solid #2c3550; border-radius: 10px; color: #eef1f8; padding: 10px; font-size: 14px; font-family: inherit; }
+  textarea { min-height: 78px; resize: vertical; }
+  input[type=range] { width: 100%; accent-color: #ff4d5e; }
+  .rangeRow { display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: #9aa3b8; }
+  .rangeRow output { min-width: 40px; text-align: right; color: #d5dbee; font-variant-numeric: tabular-nums; }
+  #timeline { width: 100%; height: 96px; background: #101116; border: 1px solid #232b42; border-radius: 10px; display: block; }
+  .topbar { display: flex; align-items: center; gap: 22px; background: #17181c; border-bottom: 1px solid #2a2b31; padding: 9px 16px; position: sticky; top: 0; z-index: 30; font-size: 14px; }
+  .tbLogo { font-weight: 700; color: #eef1f8; } .tbLogo b { color: #ff4d5e; }
+  .tbMenu { display: flex; gap: 18px; color: #9aa0ae; }
+  .tbMenu a { color: #9aa0ae; text-decoration: none; }
+  .tbMenu .tbOn { color: #fff; border-bottom: 2px solid #ff4d5e; padding-bottom: 2px; }
+  .tbRight { margin-left: auto; color: #71768a; font-size: 12.5px; }
+  @media (max-width: 700px) { .tbRight { display: none; } }
+  .hint { font-size: 12.5px; color: #78829c; margin-top: 6px; }
+  #btnAuto { width: 100%; padding: 14px; border: none; border-radius: 12px; background: #31406e; color: #fff; font-size: 16px; font-weight: 800; cursor: pointer; margin-top: 14px; }
+  #btnAuto:disabled { opacity: .45; }
+  #btnExport { width: 100%; padding: 16px; border: none; border-radius: 12px; background: #ff4d5e; color: #fff; font-size: 17px; font-weight: 800; cursor: pointer; margin-top: 14px; }
+  #btnExport:disabled { opacity: .45; }
+  #btnExportTop { width: 100%; padding: 12px; border: none; border-radius: 12px; background: #ff4d5e; color: #fff; font-size: 15px; font-weight: 800; cursor: pointer; margin-top: 10px; }
+  #btnExportTop:disabled { opacity: .45; }
+  #dlLink { margin-top: 10px; text-align: center; background: #1d3a24; border: 1px solid #2f7a44; color: #9fe8ae; padding: 12px; border-radius: 12px; font-weight: 700; text-decoration: none; font-size: 14.5px; }
+  footer { color: #5d6580; font-size: 12.5px; text-align: center; margin-top: 22px; }
+  /* ── PC layout — pro editor jaisa (Premiere/FilmCraft andaaz): upar bar, baayein media bin, beech me Program preview, daayein properties/effects, neeche poori chaudi timeline ── */
+  @media (min-width: 1024px) {
+    body { background: #08090d; }
+    .wrap { max-width: 1560px; padding: 0 14px 40px; display: grid; grid-template-columns: 320px minmax(0, 1fr) 370px; column-gap: 12px; align-items: start; }
+    header { grid-column: 1 / -1; display: flex; align-items: baseline; gap: 16px; text-align: left; padding: 12px 6px; border-bottom: 1px solid #232b42; margin-bottom: 12px; }
+    h1 { font-size: 22px; }
+    .tag { margin: 0; }
+    .stageCard { grid-column: 2; grid-row: 2; position: static; margin-top: 0; background: #10141f; }
+    canvas#stage { max-width: 380px; }
+    .card { margin-top: 0; margin-bottom: 12px; background: #10141f; }
+    .cardMedia { grid-column: 1; grid-row: 2 / span 3; }
+    .cardStyle { grid-column: 3; grid-row: 2; }
+    .cardText { grid-column: 3; grid-row: 3; }
+    .cardPro { grid-column: 3; grid-row: 4; }
+    #btnAuto { grid-column: 2; grid-row: 3; margin-top: 0; padding: 15px; font-size: 16px; }
+    #btnExport { grid-column: 2; grid-row: 4; margin-top: 0; }
+    .cardTl { grid-column: 1 / -1; grid-row: 5; }
+    .cardTl select { max-width: 560px; }
+    #timeline { height: 96px; }
+    .wrap > p.hint { grid-column: 1 / -1; grid-row: 6; }
+    footer { grid-column: 1 / -1; }
+    /* pro panel look — FilmCraft/Premiere andaaz */
+    .wrap > header { display: none; }
+    .card, .stageCard { background: #17181c; border: 1px solid #2a2b31; border-radius: 8px; }
+    .card h2 { font-size: 11.5px; letter-spacing: 1.4px; text-transform: uppercase; color: #9aa0ae; border-bottom: 1px solid #26272e; padding-bottom: 9px; margin-bottom: 12px; }
+    #timeline { height: auto; border-radius: 6px; }
+    .topbar { font-size: 14.5px; }
+  }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <span class="tbLogo">🎬 BeatCut <b>Studio</b></span>
+  <span class="tbMenu"><a href="#" id="tbImport">Import</a><span class="tbOn">Edit</span><a href="#" id="tbExport">Export</a></span>
+  <span class="tbRight">Any song · Any video · Edited on the beat</span>
+</div>
+<div class="wrap">
+  <header>
+    <h1>🎬 BeatCut <span class="b">Studio</span></h1>
+    <p class="tag">CapCut-style editor that cuts <b>on the beat of your song</b>. Add media, tap Auto Edit, export. Everything stays on your device.</p>
+  </header>
+
+  <div class="stageCard">
+    <canvas id="stage" width="720" height="1280"></canvas>
+    <div class="transport">
+      <button id="btnPlay" disabled title="Play / pause">▶</button>
+      <span id="timeLabel">0.0s / 0.0s</span>
+    </div>
+    <div id="beatInfo"></div>
+    <div id="status">Add your clip/photo and a song below to start 👇</div>
+    <button id="btnExportTop" disabled>⬇ DOWNLOAD VIDEO</button>
+    <a id="dlLink" href="#" style="display:none">⬇ Download from here — your video is ready</a>
+  </div>
+
+  <div class="card cardMedia">
+    <h2>1 · Media</h2>
+    <label class="f">Video clips (one or more) — or leave empty for photo mode</label>
+    <input type="file" id="fileClips" accept="video/*" multiple>
+    <label class="f">Photos (used when there are no clips)</label>
+    <input type="file" id="filePhotos" accept="image/*" multiple>
+    <label class="f">Song — this drives the whole edit 🎵</label>
+    <input type="file" id="fileSong" accept="audio/*">
+  </div>
+
+  <button id="btnAuto" disabled>⚡ AUTO EDIT — cut on the beat</button>
+
+  <div class="card cardTl">
+    <h2>2 · Timeline &amp; trim</h2>
+    <canvas id="timeline" width="1440" height="220"></canvas>
+    <p class="hint">This is your edit: blue blocks on V1 are your cuts, the green track below is your song. Click a block to select it. DRAG a block left/right to move it. Drag a block's edge to trim it. Click the ruler on top to jump there.</p>
+    <div class="rangeRow"><span>Start</span><input type="range" id="trimStart" min="0" max="100" value="0" step="0.1"><output id="trimStartVal">0.0s</output></div>
+    <div class="rangeRow"><span>End</span><input type="range" id="trimEnd" min="0" max="100" value="100" step="0.1"><output id="trimEndVal">0.0s</output></div>
+    <label class="f">Cut speed</label>
+    <select id="cutRate">
+      <option value="auto">Auto (based on style)</option>
+      <option value="1">Cut on every beat (fastest)</option>
+      <option value="2">Every 2 beats</option>
+      <option value="4">Every 4 beats (calm)</option>
+      <option value="strong">Only on strong beats / drop</option>
+    </select>
+    <label class="f">✂ Segment edit — tap a part on the timeline to select it, then change it</label>
+    <div id="segInfo" class="hint">No part selected yet. Tap the timeline above.</div>
+    <label>Timeline zoom <input type="range" id="tlZoom" min="1" max="4" step="0.5" value="1" style="width:150px;vertical-align:middle"></label>
+    <label class="f">Clip/photo in the selected part</label>
+    <select id="segClip"><option value="-1">Auto (round-robin)</option></select>
+    <label class="f">Speed of the selected part</label>
+    <select id="segSpeed">
+      <option value="">Auto</option><option value="0.5">0.5× — slow</option><option value="0.8">0.8×</option><option value="1">1× — normal</option><option value="1.3">1.3×</option><option value="1.6">1.6× — fast</option><option value="2">2× — very fast</option>
+    </select>
+    <label class="f">Transition of the selected part</label>
+    <select id="segTrans">
+      <option value="">Auto</option><option value="none">Straight cut</option><option value="fade">Fade</option><option value="slide">Slide</option>
+    </select>
+    <label class="f">Zoom punch of the selected part</label>
+    <select id="segZoom">
+      <option value="">Auto</option><option value="0">Off</option><option value="0.7">Light</option><option value="1">Normal</option><option value="1.6">Strong</option>
+    </select>
+    <label class="f">Effects on the selected part — set them yourself</label>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
+      <select id="segFxGlitch"><option value="">Glitch: Auto</option><option value="on">Glitch: ON</option><option value="off">Glitch: OFF</option></select>
+      <select id="segFxShake"><option value="">Shake: Auto</option><option value="on">Shake: ON</option><option value="off">Shake: OFF</option></select>
+      <select id="segFxFlash"><option value="">Flash: Auto</option><option value="on">Flash: ON</option><option value="off">Flash: OFF</option></select>
+      <select id="segFxZoom"><option value="">Zoom FX: Auto</option><option value="on">Zoom FX: ON</option><option value="off">Zoom FX: OFF</option></select>
+      <select id="segFxStickers"><option value="">Stickers: Auto</option><option value="on">Stickers: ON</option><option value="off">Stickers: OFF</option></select>
+      <select id="segFxBlur"><option value="">Blur: Auto</option><option value="on">Blur: ON</option><option value="off">Blur: OFF</option></select>
+    </div>
+    <div class="chips" style="margin-top:12px">
+      <button class="chip" id="btnSegSplit" type="button">✂ Split in the middle</button>
+      <button class="chip" id="btnSegSplitPlay" type="button">✂ Split at playhead</button>
+      <button class="chip" id="btnSegDel" type="button">🗑 Delete this part</button>
+    </div>
+    <p class="hint">Note: AUTO EDIT or changing the trim rebuilds the parts — manual changes will reset.</p>
+  </div>
+
+  <div class="card cardStyle">
+    <h2>3 · Style &amp; effects</h2>
+    <div class="chips" id="presets">
+      <button class="chip on" data-preset="auto">🤖 Auto — based on the song</button>
+      <button class="chip" data-preset="funk">🔥 Funk Blast</button>
+      <button class="chip" data-preset="lyrics">👑 Lyrics King</button>
+      <button class="chip" data-preset="dreamy">🌹 Dreamy Romantic</button>
+      <button class="chip" data-preset="cinematic">🎬 Cinematic</button>
+    </div>
+    <div class="checks" style="margin-top:12px">
+      <label><input type="checkbox" id="fxGlitch" checked> Glitch on drop</label>
+      <label><input type="checkbox" id="fxShake" checked> Beat shake</label>
+      <label><input type="checkbox" id="fxFlash" checked> Flash on strong beats</label>
+      <label><input type="checkbox" id="fxZoom" checked> Zoom punch on cuts</label>
+      <label><input type="checkbox" id="fxStickers"> Sparkle / heart stickers</label>
+      <label><input type="checkbox" id="fxVignette" checked> Vignette</label>
+      <label><input type="checkbox" id="fxBlur" checked> Motion blur on hits</label>
+      <label><input type="checkbox" id="fxStreak" checked> Glow streaks on strong beats</label>
+      <label><input type="checkbox" id="fxBars"> Cinematic black bars (letterbox)</label>
+    </div>
+    <label class="f">Quality</label>
+    <div class="checks">
+      <label><input type="checkbox" id="qEnhance" checked> Clean colour + contrast</label>
+      <label><input type="checkbox" id="qSharp" checked> Sharpen</label>
+    </div>
+    <label class="f">Export size</label>
+    <select id="qSize">
+      <option value="720">Standard (fast)</option>
+      <option value="1080">HD (slower)</option>
+    </select>
+    <label class="f">Video size / shape</label>
+    <select id="fmtSize">
+      <option value="916">9:16 Vertical — Reels / Shorts (720 × 1280)</option>
+      <option value="45">4:5 Portrait — Instagram feed (864 × 1080)</option>
+      <option value="11">1:1 Square — Instagram post (900 × 900)</option>
+      <option value="169">16:9 Wide — YouTube (1280 × 720)</option>
+    </select>
+  </div>
+
+  <div class="card cardText">
+    <h2>4 · Text / lyrics</h2>
+    <label class="f">Big opening text (hook) — can be left empty</label>
+    <input type="text" id="hookText" placeholder="e.g. LADDO RANI 🔥">
+    <label class="f">Lyrics / spoken words — one line per line (auto-synced to the voice)</label>
+    <textarea id="lyrics" placeholder="type your first line here
+second line goes here
+third line here"></textarea>
+    <label class="f">Text style</label>
+    <select id="textStyle">
+      <option value="captions">Captions — karaoke subtitles (words light up as they are sung)</option>
+      <option value="wordpop" selected>Word by word — big pop (funk)</option>
+      <option value="wordcards">Word cards — red letters, black screen</option>
+      <option value="wordrotate">Word by word — spin-in entry</option>
+      <option value="wordslam">Word by word — slam (big → small)</option>
+      <option value="linefade">Line by line — soft fade</option>
+      <option value="wordflip">Word by word — flip in</option>
+      <option value="neon">Neon glow words</option>
+      <option value="flicker">Flicker words (glitch text)</option>
+      <option value="typewriter">Typewriter — letter by letter</option>
+      <option value="vertical">Vertical words — tall side text</option>
+    </select>
+    <label class="f">Small name in the corner (watermark, optional)</label>
+    <input type="text" id="watermark" placeholder="e.g. your channel name">
+  </div>
+
+  <div class="card cardPro">
+    <h2>5 · Pro Edit — manual control (After Effects style)</h2>
+    <p class="hint">These sliders change the preview instantly — tune them your way. 100% means normal.</p>
+    <div class="rangeRow"><span>Zoom punch</span><input type="range" id="mZoom" min="0" max="200" value="100" step="5"><output id="mZoomVal">100%</output></div>
+    <div class="rangeRow"><span>Beat shake</span><input type="range" id="mShake" min="0" max="200" value="100" step="5"><output id="mShakeVal">100%</output></div>
+    <div class="rangeRow"><span>Clip speed</span><input type="range" id="mSpd" min="50" max="200" value="100" step="5"><output id="mSpdVal">100%</output></div>
+    <div class="rangeRow"><span>Rotation</span><input type="range" id="mRot" min="-12" max="12" value="0" step="1"><output id="mRotVal">0°</output></div>
+    <div class="rangeRow"><span>Text glow</span><input type="range" id="mGlow" min="0" max="200" value="100" step="5"><output id="mGlowVal">100%</output></div>
+    <div class="rangeRow"><span>Brightness</span><input type="range" id="mBri" min="50" max="150" value="100" step="2"><output id="mBriVal">100%</output></div>
+    <div class="rangeRow"><span>Contrast</span><input type="range" id="mCon" min="50" max="200" value="100" step="2"><output id="mConVal">100%</output></div>
+    <div class="rangeRow"><span>Colour (saturation)</span><input type="range" id="mSat" min="0" max="200" value="100" step="2"><output id="mSatVal">100%</output></div>
+    <div class="rangeRow"><span>Blur</span><input type="range" id="mBlur" min="0" max="8" value="0" step="0.5"><output id="mBlurVal">0px</output></div>
+    <label class="f">Transition on cuts</label>
+    <select id="mTrans">
+      <option value="none">None (straight cut)</option>
+      <option value="fade">Fade in</option>
+      <option value="slide">Slide entry</option>
+    </select>
+  </div>
+
+  <button id="btnExport" disabled>⬇ DOWNLOAD VIDEO</button>
+  <p class="hint" style="text-align:center">Export takes as long as the song is (real-time render). You get MP4 if supported, otherwise WebM.</p>
+
+  <footer>BeatCut Studio — your files never leave your device. Everything runs in your browser.</footer>
+</div>
+<audio id="songEl" preload="auto" style="display:none"></audio>
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const canvas = $("stage"), ctx = canvas.getContext("2d");
+let W = 720, H = 1280;
+const songEl = $("songEl");
+
+const S = {
+  preset: "auto",
+  clips: [], photos: [], songBuf: null, duration: 0,
+  beats: [], segments: [], wordTimes: [], lineTimes: [],
+  t0: 0, t1: 0, ready: false, playing: false, exporting: false,
+  particles: [], lastBeatIdx: -1, lastSegIdx: -1, flash: 0, shakeAmp: 0,
+  errShown: false, audioGraph: null,
+};
+const PRESETS = {
+  funk:      { beatsPerCut: 1, shake: 0.7, zoomPunch: 0.22, grade: "contrast(1.07) saturate(1.07)", stickers: "none" },
+  lyrics:    { beatsPerCut: 2, shake: 0.4, zoomPunch: 0.16, grade: "contrast(1.05) saturate(1.08)", stickers: "none" },
+  dreamy:    { beatsPerCut: 4, shake: 0.15, zoomPunch: 0.07, grade: "brightness(1.04) saturate(1.12)", stickers: "none" },
+  cinematic: { beatsPerCut: 4, shake: 0.2, zoomPunch: 0.10, grade: "contrast(1.18) saturate(0.82) brightness(0.96)", stickers: "none" },
+};
+function rng32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function effPreset() {
+  if (S.preset !== "auto") return S.preset;
+  const bpm = S.bpm || 0;
+  if (bpm >= 120) return "funk";
+  if (bpm >= 96) return "lyrics";
+  if (bpm > 0) return "dreamy";
+  return "lyrics";
+}
+const mode = () => S.clips.length ? "clips" : (S.photos.length ? "photos" : "song");
+function setStatus(t) { $("status").textContent = t; }
+
+/* ---------------- media ---------------- */
+$("fileClips").addEventListener("change", e => {
+  S.clips.forEach(c => { try { c.el.pause(); } catch(_){} });
+  S.clips = [...e.target.files].map(f => {
+    const el = document.createElement("video");
+    el.src = URL.createObjectURL(f); el.muted = true; el.loop = true; el.playsInline = true; el.preload = "auto";
+    el.addEventListener("loadeddata", () => { if (S.ready) drawFrame(previewT()); });
+    return { el };
+  });
+  if (S.clips.length) setStatus(S.clips.length + " clip(s) added ✅ Now add a song (or press Auto Edit).");
+  refreshReady();
+});
+$("filePhotos").addEventListener("change", e => {
+  S.photos = [];
+  [...e.target.files].forEach(f => {
+    const img = new Image();
+    img.onload = () => { S.photos.push({ img }); refreshReady(); if (S.ready) drawFrame(previewT()); };
+    img.src = URL.createObjectURL(f);
+  });
+  if (e.target.files.length) setStatus("Loading photos…");
+});
+$("fileSong").addEventListener("change", async e => {
+  const f = e.target.files[0]; if (!f) return;
+  songEl.src = URL.createObjectURL(f);
+  setStatus("Listening to the song… finding the beats 🎧");
+  let buf;
+  try {
+    const raw = await f.arrayBuffer();
+    const AC = window.AudioContext || window.webkitAudioContext;
+    const ac = new AC();
+    buf = await ac.decodeAudioData(raw);
+    try { await ac.close(); } catch(_){}
+  } catch (err) {
+    setStatus("❌ Couldn't read this song file — try another audio file (mp3).");
+    return;
+  }
+  S.songBuf = buf; S.duration = buf.duration; S.t0 = 0; S.t1 = buf.duration;
+  $("trimStart").max = buf.duration; $("trimEnd").max = buf.duration;
+  $("trimStart").value = 0; $("trimEnd").value = buf.duration;
+  $("trimStartVal").textContent = "0.0s"; $("trimEndVal").textContent = buf.duration.toFixed(1) + "s";
+  try { analyseBeats(); } catch (err) { setStatus("❌ Beat analysis failed — try another song."); return; }
+  refreshReady();
+});
+
+/* ---------------- beat engine (tested) ---------------- */
+function analyseBeats() {
+  const buf = S.songBuf, sr = buf.sampleRate, ch = buf.numberOfChannels;
+  const data = new Float32Array(buf.length);
+  for (let c = 0; c < ch; c++) { const d = buf.getChannelData(c); for (let i = 0; i < d.length; i++) data[i] += d[i] / ch; }
+  const NB = 600; S.wave = new Array(NB).fill(0);
+  const per = Math.max(1, Math.floor(data.length / NB));
+  for (let b = 0; b < NB; b++) { let mx = 0; const st = b * per; for (let i = st; i < Math.min(data.length, st + per); i += 16) { const v = Math.abs(data[i]); if (v > mx) mx = v; } S.wave[b] = mx; }
+  let wmax = 0; S.wave.forEach(v => { if (v > wmax) wmax = v; });
+  if (wmax) S.wave = S.wave.map(v => v / wmax);
+  const lp = new Float32Array(data.length); let prev = 0; const a = 0.12;
+  for (let i = 0; i < data.length; i++) { prev = prev + a * (data[i] - prev); lp[i] = prev; }
+  const hop = 512, win = 2048, n = Math.floor((lp.length - win) / hop);
+  const env = new Float32Array(n);
+  for (let k = 0; k < n; k++) { let s = 0; const off = k * hop; for (let i = 0; i < win; i += 4) { const v = lp[off + i]; s += v * v; } env[k] = s; }
+  const flux = new Float32Array(n);
+  for (let k = 1; k < n; k++) flux[k] = Math.max(0, env[k] - env[k - 1]);
+  const beats = [], hopSec = hop / sr, W2 = 40; let lastT = -1;
+  for (let k = 2; k < n - 2; k++) {
+    if (flux[k] <= 0 || flux[k] < flux[k - 1] || flux[k] < flux[k + 1]) continue;
+    let mean = 0, cnt = 0;
+    for (let j = Math.max(0, k - W2); j < Math.min(n, k + W2); j++) { mean += flux[j]; cnt++; }
+    mean /= cnt;
+    const t = k * hopSec;
+    if (flux[k] > mean * 1.9 && t - lastT > 0.23) { beats.push({ t, s: flux[k] }); lastT = t; }
+  }
+  let max = 0; beats.forEach(b => { if (b.s > max) max = b.s; });
+  beats.forEach(b => { b.s = max ? Math.pow(b.s / max, 0.7) : 0; });
+  if (beats.length < 4) { for (let t = 0.25; t < S.duration; t += 0.5) beats.push({ t, s: 0.5 }); }
+  // vocal/syllable onsets: full-band energy attacks — the voice lives here; lyric words snap to these
+  const hop2 = 256, win2 = 1024, n2 = Math.floor((data.length - win2) / hop2);
+  const env2 = new Float32Array(Math.max(0, n2));
+  for (let k = 0; k < n2; k++) { let sm = 0; const off = k * hop2; for (let i = 0; i < win2; i += 8) { const v = data[off + i]; sm += v * v; } env2[k] = sm; }
+  const vocal = []; let lastV = -1;
+  for (let k = 2; k < n2 - 2; k++) {
+    const f = env2[k] - env2[k - 1]; if (f <= 0) continue;
+    if (f < env2[k - 1] - env2[k - 2] || f < env2[k + 1] - env2[k]) continue;
+    let mean = 0, cnt = 0;
+    for (let j = Math.max(1, k - 60); j < Math.min(n2, k + 60); j++) { const d = env2[j] - env2[j - 1]; if (d > 0) { mean += d; cnt++; } }
+    mean = cnt ? mean / cnt : 0;
+    const tv = k * hop2 / sr;
+    if (f > mean * 2.2 && tv - lastV > 0.13) { vocal.push({ t: tv, s: f }); lastV = tv; }
+  }
+  let vmax = 0; vocal.forEach(v => { if (v.s > vmax) vmax = v.s; });
+  vocal.forEach(v => { v.s = vmax ? v.s / vmax : 0; });
+  S.vocal = vocal;
+  S.beats = beats;
+  let bpm = 0;
+  if (beats.length > 2) { const gaps = []; for (let i = 1; i < beats.length; i++) gaps.push(beats[i].t - beats[i-1].t); gaps.sort((x, y) => x - y); bpm = Math.round(60 / gaps[Math.floor(gaps.length / 2)]); }
+  S.bpm = bpm;
+  S.seed = (Math.floor(S.duration * 97) ^ (beats.length * 131) ^ (bpm * 17) ^ (buf.length % 100000)) | 0;
+  $("beatInfo").textContent = "✅ Song understood: " + beats.length + " beats" + (bpm ? " · ~" + bpm + " BPM" : "") + " · " + Math.round(S.duration) + "s" + (S.preset === "auto" ? " · Style auto-picked: " + ({ funk: "🔥 Funk Blast", lyrics: "👑 Lyrics King", dreamy: "🌹 Dreamy Romantic", cinematic: "🎬 Cinematic" })[effPreset()] : "");
+}
+
+/* ---------------- timeline build ---------------- */
+function buildTimeline() {
+  const rate = $("cutRate").value;
+  const P = PRESETS[effPreset()];
+  const inRange = S.beats.filter(b => b.t >= S.t0 && b.t <= S.t1);
+  let cutTimes = [S.t0];
+  if (rate === "strong") {
+    inRange.filter(b => b.s > 0.62).forEach(b => cutTimes.push(b.t));
+  } else {
+    const step0 = rate === "auto" ? P.beatsPerCut : parseInt(rate, 10);
+    const step = (rate === "auto" && S.bpm > 160) ? step0 * 2 : step0;
+    const minGap = S.bpm > 160 ? 0.5 : 0.3, minGap2 = S.bpm > 160 ? 0.42 : 0.25;
+    let since = 0, lastCut = S.t0;
+    inRange.forEach(b => {
+      since++;
+      const strong = b.s > 0.75, weak = b.s < 0.22;
+      if ((since >= step && !weak) || (strong && since >= 1 && b.t - lastCut > minGap) || (since >= step * 2)) {
+        if (b.t - lastCut > minGap2) { cutTimes.push(b.t); lastCut = b.t; since = 0; }
+      }
+    });
+  }
+  cutTimes.push(S.t1);
+  cutTimes = [...new Set(cutTimes.map(x => Math.round(x * 100) / 100))].sort((a, b) => a - b);
+  S.segments = [];
+  for (let i = 0; i < cutTimes.length - 1; i++) {
+    if (cutTimes[i + 1] - cutTimes[i] < 0.12) continue;
+    S.segments.push({ start: cutTimes[i], end: cutTimes[i + 1], idx: S.segments.length });
+  }
+  S.selSeg = -1;
+  const funky = effPreset() === "funk";
+  S.segments.forEach((sg, i) => {
+    let str = 0.5;
+    for (const b of S.beats) { if (Math.abs(b.t - sg.start) < 0.08) { str = b.s; break; } }
+    sg.zAmt = 0.7 + str * 0.9;
+    sg.rate = (funky && str > 0.8) ? 1.25 : (funky && str < 0.25 ? 0.9 : 1);
+    sg.dir = i % 2 ? -1 : 1;
+    sg.kb = i % 2 ? -1 : 1;
+    sg.tr = i === 0 ? "fade" : "none";
+  });
+  const cursors = {};
+  S.segments.forEach(sg => {
+    if (!S.clips.length) return;
+    const ci = (sg.clipIdx != null ? sg.clipIdx : sg.idx) % S.clips.length;
+    const dur = S.clips[ci].el.duration || 0;
+    if (dur > 1) {
+      let cur = cursors[ci] || 0;
+      if (cur > dur - 0.6) cur = 0;
+      sg.srcStart = Math.round(cur * 100) / 100;
+      cursors[ci] = cur + (sg.end - sg.start);
+    }
+  });
+  const lines = $("lyrics").value.split("\n").map(x => x.trim()).filter(Boolean);
+  S.wordTimes = []; S.lineTimes = [];
+  const tStart = $("hookText").value.trim() ? S.t0 + 1.6 : S.t0;
+  const pool = inRange.filter(b => b.t >= tStart && b.s > 0.35); const use = pool.length >= 4 ? pool : inRange.filter(b => b.t >= tStart);
+  let bi = 0, pass = 0;
+  while (bi < use.length && pass < 8 && lines.length) {
+    lines.forEach((line, li) => {
+      if (bi < use.length) S.lineTimes.push({ line, t: use[bi].t });
+      line.split(/\s+/).filter(Boolean).forEach(w => { if (bi < use.length) { S.wordTimes.push({ word: w, t: use[bi].t, ln: li }); bi++; } });
+    });
+    pass++;
+  }
+  if (S.vocal && S.vocal.length >= 4) {
+    const snap = (tt, win) => { let best = null, bd = win; for (const v of S.vocal) { const d = Math.abs(v.t - tt); if (d < bd) { bd = d; best = v.t; } } return best != null ? best : tt; };
+    S.lineTimes.forEach(L => { L.t = snap(L.t, 0.4); });
+    S.lineTimes.sort((a, b) => a.t - b.t);
+    let prev = -1;
+    S.wordTimes.forEach(wd => { let nt = snap(wd.t, 0.3); if (nt <= prev + 0.05) nt = wd.t > prev + 0.05 ? wd.t : prev + 0.06; wd.t = Math.round(nt * 100) / 100; prev = wd.t; });
+  }
+  S.lastBeatIdx = -1; S.lastSegIdx = -1; S.particles = [];
+  drawTimelineStrip();
+  syncSegUI();
+}
+function tlSignature() { return $("lyrics").value + "|" + $("hookText").value + "|" + S.t0 + "-" + S.t1 + "|" + $("cutRate").value + "|" + S.preset + "|" + S.beats.length + "|" + (S.seed || 0); }
+function ensureTimeline() { const sig = tlSignature(); if (sig !== S.tlSig) { S.tlSig = sig; buildTimeline(); } }
+$("lyrics").addEventListener("input", () => { if (S.songBuf) ensureTimeline(); });
+$("hookText").addEventListener("input", () => { if (S.songBuf) ensureTimeline(); });
+function segLabel(sg) {
+  if (S.clips.length) return "Clip " + (((sg.clipIdx != null ? sg.clipIdx : sg.idx) % S.clips.length) + 1);
+  if (S.photos.length) return "Photo " + (((sg.clipIdx != null ? sg.clipIdx : sg.idx) % S.photos.length) + 1);
+  return "Beat FX";
+}
+function tlGeom() {
+  const c = $("timeline");
+  const sc = c.width / 1440;
+  const GUT = 46 * sc, RW = c.width - GUT;
+  const span = Math.max(0.01, S.t1 - S.t0);
+  const z = S.tlZoom || 1;
+  const vSpan = span / z;
+  let v0 = (S.viewT0 != null && z > 1) ? S.viewT0 : S.t0;
+  v0 = Math.min(Math.max(v0, S.t0), S.t1 - vSpan);
+  if (z <= 1) v0 = S.t0;
+  return { c, s: sc, GUT, RW, v0, v1: v0 + vSpan, vSpan };
+}
+function drawTimelineStrip() {
+  const c = $("timeline"), g = c.getContext("2d");
+  const desk = window.innerWidth >= 1024;
+  const wantW = desk ? 1440 : 720, wantH = desk ? 220 : 110;
+  if (c.width !== wantW || c.height !== wantH) { c.width = wantW; c.height = wantH; }
+  const gm = tlGeom(), tw = c.width, th = c.height, s = gm.s;
+  const GUT = gm.GUT, RW = gm.RW;
+  const xOf = t => GUT + (t - gm.v0) / gm.vSpan * RW;
+  g.fillStyle = "#101116"; g.fillRect(0, 0, tw, th);
+  g.fillStyle = "#17181d"; g.fillRect(0, 0, tw, 30 * s);
+  g.fillStyle = "#8a8f9e"; g.font = Math.round(19 * s) + "px system-ui"; g.textAlign = "left"; g.textBaseline = "middle";
+  const stepS = gm.vSpan > 90 ? 10 : gm.vSpan > 40 ? 5 : gm.vSpan > 18 ? 2 : gm.vSpan > 8 ? 1 : 0.5;
+  for (let sec = Math.ceil(gm.v0 * 2) / 2; sec <= gm.v1; sec += stepS) {
+    const x = xOf(sec);
+    g.fillRect(x, 17 * s, 2 * s, 13 * s);
+    g.fillText(Math.floor(sec / 60) + ":" + String(Math.floor(sec % 60)).padStart(2, "0"), x + 5 * s, 11 * s);
+  }
+  g.fillStyle = "rgba(255,255,255,0.35)";
+  S.beats.forEach(b => { if (b.t < gm.v0 || b.t > gm.v1) return; g.fillRect(xOf(b.t), 23 * s, 1.5 * s, 7 * s); });
+  g.fillStyle = "#23242b"; g.fillRect(0, 34 * s, GUT - 4 * s, 80 * s); g.fillRect(0, 120 * s, GUT - 4 * s, 80 * s);
+  g.fillStyle = "#cfd4e4"; g.font = "700 " + Math.round(21 * s) + "px system-ui"; g.textAlign = "center";
+  g.fillText("V1", (GUT - 4 * s) / 2, 74 * s); g.fillText("A1", (GUT - 4 * s) / 2, 160 * s);
+  g.textAlign = "left";
+  S.segments.forEach((sg, i) => {
+    if (sg.end < gm.v0 || sg.start > gm.v1) return;
+    const x = xOf(Math.max(sg.start, gm.v0)), x2 = xOf(Math.min(sg.end, gm.v1));
+    const wdt = Math.max(2, x2 - x - 2 * s);
+    g.fillStyle = i % 2 ? "#274b73" : "#2f5d8f";
+    g.fillRect(x, 36 * s, wdt, 78 * s);
+    if (wdt > 58 * s) {
+      g.fillStyle = "rgba(255,255,255,0.92)"; g.font = Math.round(18 * s) + "px system-ui";
+      g.fillText(segLabel(sg), x + 7 * s, 62 * s, wdt - 12 * s);
+      g.fillStyle = "rgba(255,255,255,0.55)"; g.font = Math.round(15 * s) + "px system-ui";
+      g.fillText((sg.end - sg.start).toFixed(1) + "s", x + 7 * s, 88 * s, wdt - 12 * s);
+    }
+  });
+  if (S.drag && S.drag.mode === "move" && S.drag.target != null && S.segments[S.drag.target]) { const sg = S.segments[S.drag.target]; const x = xOf(sg.start), wdt = Math.max(3, (sg.end - sg.start) / gm.vSpan * RW - 2 * s); g.strokeStyle = "#ffffff"; g.lineWidth = 3 * s; g.strokeRect(x + 1, 35 * s, wdt - 2, 80 * s); }
+  if (S.selSeg >= 0 && S.segments[S.selSeg]) { const sg = S.segments[S.selSeg]; const x = xOf(sg.start), wdt = Math.max(3, (sg.end - sg.start) / gm.vSpan * RW - 2 * s); g.strokeStyle = "#ffd23e"; g.lineWidth = 3.5 * s; g.strokeRect(x + 1, 35 * s, wdt - 2, 80 * s); }
+  g.fillStyle = "#14151a"; g.fillRect(GUT, 120 * s, RW, 80 * s);
+  if (S.wave && S.duration) {
+    g.fillStyle = "#3fae6a";
+    const midY = 160 * s, maxH = 36 * s, colW = Math.max(2, Math.round(3 * s));
+    const cols = Math.floor(RW / colW);
+    for (let i = 0; i < cols; i++) {
+      const tt = gm.v0 + (i / cols) * gm.vSpan;
+      const bi = Math.min(S.wave.length - 1, Math.floor(tt / S.duration * S.wave.length));
+      const h = Math.max(1.2 * s, S.wave[bi] * maxH);
+      g.fillRect(GUT + i * colW, midY - h, colW - 1, h * 2);
+    }
+    g.fillStyle = "rgba(255,255,255,0.5)"; g.font = Math.round(15 * s) + "px system-ui";
+    g.fillText("Song — cut on the beat", GUT + 8 * s, 132 * s);
+  }
+  const pt = previewT();
+  if (pt >= gm.v0 && pt <= gm.v1) { const px = xOf(pt); g.fillStyle = "#ff4d5e"; g.fillRect(px - 1.5 * s, 0, 3 * s, th); }
+}
+function previewT() { return songEl.currentTime || S.t0; }
+function refreshReady() {
+  S.ready = !!S.songBuf && (S.clips.length > 0 || S.photos.length > 0 || true);
+  const has = !!S.songBuf;
+  $("btnPlay").disabled = !has; $("btnExport").disabled = !has; $("btnExportTop").disabled = !has; $("btnAuto").disabled = !has;
+  if (has) { buildTimeline(); setStatus("Ready ✅ Press Play to watch, or Export directly."); drawFrame(previewT()); }
+}
+
+/* ---------------- drawing ---------------- */
+function drawCover(src, sw, sh, zoom, panX) {
+  if (!sw || !sh) return;
+  const scale = Math.max(W / sw, H / sh) * zoom;
+  const dw = sw * scale, dh = sh * scale;
+  ctx.drawImage(src, (W - dw) / 2 + panX, (H - dh) / 2, dw, dh);
+}
+function segAt(t) {
+  const segs = S.segments; if (!segs.length) return { start: S.t0, end: S.t1, idx: 0 };
+  let ans = segs[0];
+  for (const sg of segs) { if (sg.start <= t) ans = sg; else break; }
+  return ans;
+}
+function beatNear(t) { let idx = -1; for (let i = 0; i < S.beats.length; i++) { if (S.beats[i].t <= t) idx = i; else break; } return idx; }
+function spawnParticles(n, set) {
+  const glyphs = set === "love" ? ["❤️", "🌸", "✨", "⭐"] : ["✨", "⭐", "💥"];
+  for (let i = 0; i < n; i++) S.particles.push({ x: Math.random() * W, y: H * 0.25 + Math.random() * H * 0.6, vy: -(30 + Math.random() * 70), vx: (Math.random() - 0.5) * 30, life: 1, g: glyphs[(Math.random() * glyphs.length) | 0], size: 22 + Math.random() * 30 });
+}
+
+function man() {
+  const v = id => parseFloat($(id).value) || 0;
+  return { zoom: v("mZoom") / 100, shake: v("mShake") / 100, glow: v("mGlow") / 100, blur: v("mBlur"), bri: v("mBri") / 100, con: v("mCon") / 100, sat: v("mSat") / 100, rot: v("mRot"), spd: v("mSpd") / 100, tr: $("mTrans").value };
+}
+function drawFrame(rawT) {
+  const t = Math.min(Math.max(rawT, S.t0), S.t1 || rawT);
+  const P = PRESETS[effPreset()];
+  const EP = effPreset();
+  const M = man();
+  const seg = segAt(t);
+  const segP = Math.min(1, (t - seg.start) / Math.max(0.01, seg.end - seg.start));
+  const bIdx = beatNear(t);
+  const beat = bIdx >= 0 ? S.beats[bIdx] : null;
+  const pulse = beat ? Math.max(0, 1 - (t - beat.t) * 3.2) * beat.s : 0;
+
+  if (bIdx !== S.lastBeatIdx) {
+    S.lastBeatIdx = bIdx;
+    if (beat && beat.s > 0.55) {
+      if (fxOn("fxFlash", seg.mFxFlash)) S.flash = Math.max(S.flash, beat.s * 0.85);
+      if (fxOn("fxStickers", seg.mFxStickers) && P.stickers !== "none") spawnParticles(beat.s > 0.8 ? 6 : 3, P.stickers);
+    }
+    if (beat) S.shakeAmp = Math.max(S.shakeAmp, beat.s * 10 * P.shake * M.shake * (fxOn("fxShake", seg.mFxShake) ? 1 : 0));
+  }
+  S.flash *= 0.82; S.shakeAmp *= 0.8;
+  const shX = (Math.random() - 0.5) * 2 * S.shakeAmp, shY = (Math.random() - 0.5) * 2 * S.shakeAmp;
+
+  ctx.save();
+  ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
+  ctx.translate(shX, shY);
+  if (M.rot) { ctx.translate(W / 2, H / 2); ctx.rotate(M.rot * Math.PI / 180); ctx.translate(-W / 2, -H / 2); }
+  let f = P.grade + " brightness(" + M.bri + ") contrast(" + M.con + ") saturate(" + M.sat + ")" + (M.blur > 0 ? " blur(" + M.blur + "px)" : "");
+  if ($("qEnhance").checked) f += " contrast(1.03) saturate(1.03)";
+  try { ctx.filter = f; } catch(_){}
+  const punch = fxOn("fxZoom", seg.mFxZoom) ? 1 + P.zoomPunch * M.zoom * (seg.mZoom != null ? seg.mZoom : (seg.zAmt || 1)) * Math.max(0, 1 - (t - seg.start) * 1.8) : 1;
+  const m = mode();
+
+  if (m === "clips") {
+    const v = S.clips[(seg.clipIdx != null ? seg.clipIdx : seg.idx) % S.clips.length].el;
+    if (v.readyState >= 2 && v.videoWidth) {
+      if (S.lastSegIdx !== seg.idx) {
+        S.lastSegIdx = seg.idx;
+        const dur = v.duration || 1;
+        try { v.currentTime = seg.srcStart != null ? seg.srcStart : (seg.idx * 3.7) % Math.max(1, dur - 0.5); } catch(_){}
+        v.playbackRate = (seg.mRate != null ? seg.mRate : (seg.rate || 1)) * (M.spd || 1);
+      }
+      if ((S.playing || S.exporting) && v.paused) v.play().catch(() => {});
+      let panX = 0; const trv = M.tr !== "none" ? M.tr : (seg.mTr != null ? seg.mTr : (seg.tr || "none"));
+      if (trv === "slide") panX = Math.max(0, 1 - segP * 3) * 90 * (seg.dir || 1);
+      if (trv === "fade") ctx.globalAlpha = Math.min(1, 0.2 + segP * 3.2);
+      drawCover(v, v.videoWidth, v.videoHeight, punch * (1 + (seg.kb > 0 ? segP : 1 - segP) * 0.24), panX + (seg.dir || 1) * segP * 34);
+      ctx.globalAlpha = 1;
+      if (fxOn("fxBlur", seg.mFxBlur) && S._lf && (segP < 0.2 || pulse > 0.75)) { try { ctx.save(); ctx.globalAlpha = 0.3; ctx.drawImage(S._lf, 0, 0, W, H); ctx.restore(); } catch(_){} }
+      try { const lc = S._lf || (S._lf = document.createElement("canvas")); if (lc.width !== canvas.width) { lc.width = canvas.width; lc.height = canvas.height; } lc.getContext("2d").drawImage(canvas, 0, 0); } catch(_){}
+    } else if (S._lf) {
+      try { ctx.drawImage(S._lf, 0, 0, W, H); } catch(_){}
+    } else {
+      ctx.fillStyle = "#1a2036"; ctx.fillRect(0, 0, W, H);
+    }
+  } else if (m === "photos") {
+    const cur = S.photos[(seg.clipIdx != null ? seg.clipIdx : seg.idx) % S.photos.length].img;
+    drawCover(cur, cur.naturalWidth, cur.naturalHeight, (1.05 + segP * 0.13) * punch, (seg.idx % 2 ? -1 : 1) * segP * 26);
+    if (segP > 0.86 && S.photos.length > 1) {
+      const nx = S.photos[(seg.idx + 1) % S.photos.length].img;
+      ctx.globalAlpha = (segP - 0.86) / 0.14 * 0.9;
+      drawCover(nx, nx.naturalWidth, nx.naturalHeight, 1.05, 0);
+      ctx.globalAlpha = 1;
+    }
+  } else {
+    const g = ctx.createRadialGradient(W/2, H*0.42, 60, W/2, H*0.5, H*0.75);
+    const hue = 265 + Math.sin(t * 0.14) * 35;
+    g.addColorStop(0, "hsl(" + hue + ",75%," + (26 + pulse * 22) + "%)");
+    g.addColorStop(1, "#05060e");
+    ctx.fillStyle = g; ctx.fillRect(-30, -30, W + 60, H + 60);
+    ctx.save(); ctx.globalCompositeOperation = "lighter";
+    const orbR = 120 + pulse * 90;
+    const og = ctx.createRadialGradient(W/2, H*0.42, 8, W/2, H*0.42, orbR * 2.2);
+    og.addColorStop(0, "hsla(" + (hue + 40) + ",95%,72%," + (0.5 + pulse * 0.4) + ")");
+    og.addColorStop(1, "hsla(0,0%,0%,0)");
+    ctx.fillStyle = og; ctx.beginPath(); ctx.arc(W/2, H*0.42, orbR * 2.2, 0, 7); ctx.fill();
+    ctx.strokeStyle = "hsla(" + hue + ",90%,75%," + (0.35 + pulse * 0.5) + ")"; ctx.lineWidth = 3;
+    for (let r = 0; r < 3; r++) { ctx.beginPath(); ctx.arc(W/2, H*0.42, orbR + r * 46 + Math.sin(t * 2 + r) * 5, 0, 7); ctx.stroke(); }
+    ctx.restore();
+    ctx.fillStyle = "rgba(255,255,255,0.85)";
+    for (let i = 0; i < 42; i++) {
+      const sx = (i * 173.3 + t * (6 + (i % 5) * 3)) % W, sy = (i * 311.7 + Math.sin(t * 0.6 + i) * 14) % H;
+      ctx.globalAlpha = 0.25 + 0.55 * Math.abs(Math.sin(t * 1.4 + i * 1.7));
+      ctx.beginPath(); ctx.arc(sx, sy, 1.4 + (i % 3), 0, 7); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+  try { ctx.filter = "none"; } catch(_){}
+
+  const doGlitch = fxOn("fxGlitch", seg.mFxGlitch) && ((EP === "funk" && pulse > 0.55) || m === "song");
+  if (doGlitch) {
+    const csx = canvas.width / W, csy = canvas.height / H;
+    const slices = EP === "funk" ? 5 : 3;
+    for (let i = 0; i < slices; i++) {
+      const gy = Math.random() * canvas.height, gh = (8 + Math.random() * 42) * csy, off = ((Math.random() - 0.5) * (EP === "funk" ? 30 : 14) * pulse + 8) * csx;
+      try { ctx.drawImage(canvas, 0, gy, canvas.width, gh, off, gy, canvas.width, gh); } catch(_){}
+    }
+    if (EP === "funk") { ctx.fillStyle = "rgba(255,40,70," + (pulse * 0.12) + ")"; ctx.fillRect(0, 0, W, H); }
+  }
+  if ($("qSharp").checked && m !== "song") {
+    ctx.save(); ctx.globalAlpha = 0.16; try { ctx.globalCompositeOperation = "overlay"; ctx.drawImage(canvas, -1.4, -1.4); } catch(_){} ctx.restore();
+  }
+  S.particles = S.particles.filter(p => p.life > 0);
+  S.particles.forEach(p => { p.life -= 0.016; p.y += p.vy * 0.016; p.x += p.vx * 0.016; ctx.save(); ctx.globalAlpha = Math.max(0, p.life); ctx.font = p.size + "px serif"; ctx.fillText(p.g, p.x, p.y); ctx.restore(); });
+  if (S.flash > 0.02) { ctx.fillStyle = "rgba(255,255,255," + Math.min(0.9, S.flash) + ")"; ctx.fillRect(-30, -30, W + 60, H + 60); }
+  ctx.restore();
+
+  if ($("fxStreak").checked && pulse > 0.55 && m !== "song") {
+    ctx.save(); ctx.globalCompositeOperation = "lighter";
+    const sa = (pulse - 0.55) * 0.45;
+    for (let i = 0; i < 3; i++) { const yy = ((i * 41 + Math.floor(t * 9) * 13) % 100) / 100 * H; const gr = ctx.createLinearGradient(0, yy, W, yy + 130); gr.addColorStop(0, "rgba(80,180,255,0)"); gr.addColorStop(0.5, "rgba(130,205,255," + sa + ")"); gr.addColorStop(1, "rgba(80,180,255,0)"); ctx.fillStyle = gr; ctx.fillRect(-30, yy, W + 60, 30); }
+    ctx.restore();
+  }
+  if ($("fxBars").checked) { ctx.fillStyle = "#000"; ctx.fillRect(-30, -30, W + 60, H * 0.1 + 30); ctx.fillRect(-30, H * 0.9, W + 60, H * 0.1 + 32); }
+  drawText(t);
+  if ($("fxVignette").checked) {
+    const vg = ctx.createRadialGradient(W/2, H/2, H*0.32, W/2, H/2, H*0.72);
+    vg.addColorStop(0, "rgba(0,0,0,0)"); vg.addColorStop(1, "rgba(0,0,0,0.5)");
+    ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
+  }
+  const wm = $("watermark").value.trim();
+  if (wm) { ctx.save(); ctx.font = "600 24px system-ui"; ctx.fillStyle = "rgba(255,255,255,0.75)"; ctx.textAlign = "right"; ctx.fillText(wm, W - 22, H - 26); ctx.restore(); }
+}
+
+/* ---------------- text ---------------- */
+function fitFont(text, weight, maxW, start) {
+  let s = start;
+  ctx.font = weight + " " + s + "px system-ui, 'Arial Black', sans-serif";
+  while (ctx.measureText(text).width > maxW && s > 24) { s -= 6; ctx.font = weight + " " + s + "px system-ui, 'Arial Black', sans-serif"; }
+  return s;
+}
+function wrapText(text, x, y, maxW, lh) {
+  const words = text.split(/\s+/); const lines = []; let cur = "";
+  words.forEach(w => { const t2 = cur ? cur + " " + w : w; if (ctx.measureText(t2).width > maxW && cur) { lines.push(cur); cur = w; } else cur = t2; });
+  if (cur) lines.push(cur);
+  lines.forEach((ln, i) => ctx.fillText(ln, x, y + (i - (lines.length - 1) / 2) * lh));
+}
+function currentOf(list, t, defEnd) {
+  let cur = null;
+  for (const it of list) { if (it.t <= t) cur = it; else break; }
+  if (!cur) return null;
+  const next = list[list.indexOf(cur) + 1];
+  return { ...cur, end: next ? next.t : cur.t + defEnd };
+}
+function drawText(t) {
+  const style = $("textStyle").value;
+  const glowF = (parseFloat($("mGlow").value) || 0) / 100;
+  ctx.save(); ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  const hook = $("hookText").value.trim();
+  const rel = t - S.t0;
+  if (hook && rel < 1.6) {
+    const a = rel < 0.2 ? rel / 0.2 : (rel > 1.35 ? Math.max(0, (1.6 - rel) / 0.25) : 1);
+    ctx.globalAlpha = a;
+    const sc = 0.7 + 0.3 * Math.min(1, rel / 0.18);
+    ctx.translate(W / 2, H * 0.4); ctx.scale(sc, sc);
+    const size = fitFont(hook.toUpperCase(), "900", W - 70, 104);
+    ctx.font = "900 " + size + "px system-ui, 'Arial Black', sans-serif";
+    ctx.lineWidth = Math.max(6, size / 9); ctx.strokeStyle = "rgba(0,0,0,0.9)"; ctx.lineJoin = "round";
+    ctx.fillStyle = "rgba(0,0,0,0.38)"; ctx.fillRect(-(W - 56) / 2, -size * 0.82, W - 56, size * 1.64);
+    ctx.strokeText(hook.toUpperCase(), 0, 0);
+    ctx.shadowColor = "rgba(255,210,62,0.95)"; ctx.shadowBlur = 18 * glowF;
+    ctx.fillStyle = "#ffd23e"; ctx.fillText(hook.toUpperCase(), 0, 0);
+    ctx.restore(); return;
+  }
+  if (style === "linefade") {
+    const L = currentOf(S.lineTimes, t, 2.4); if (!L) { ctx.restore(); return; }
+    const age = t - L.t, life = L.end - L.t;
+    ctx.globalAlpha = Math.max(0, Math.min(1, age / 0.25) * (life - age < 0.4 ? Math.max(0, (life - age) / 0.4) : 1));
+    fitFont(L.line, "700", W - 90, 54);
+    ctx.shadowColor = "rgba(0,0,0,0.65)"; ctx.shadowBlur = 16; ctx.fillStyle = "#fff";
+    wrapText(L.line, W / 2, H * 0.8, W - 90, 62);
+    ctx.restore(); return;
+  }
+  if (style === "captions") {
+    const L = currentOf(S.lineTimes, t, 2.4); if (!L) { ctx.restore(); return; }
+    const age = t - L.t, life = L.end - L.t;
+    if (age > 3.2) { ctx.restore(); return; }
+    ctx.globalAlpha = Math.max(0, Math.min(1, age / 0.2) * (life - age < 0.35 ? Math.max(0, (life - age) / 0.35) : 1));
+    const lineWords = S.wordTimes.filter(w => w.t >= L.t - 0.02 && w.t < L.end);
+    const words = L.line.split(/\s+/).filter(Boolean);
+    const size = fitFont(L.line.toUpperCase(), "800", W - 90, 56);
+    ctx.font = "800 " + size + "px system-ui, sans-serif";
+    const widths = words.map(w => ctx.measureText(w.toUpperCase()).width);
+    const spW = ctx.measureText(" ").width;
+    const total = widths.reduce((a, b) => a + b, 0) + spW * Math.max(0, words.length - 1);
+    const barH = size * 1.7, barY = H * 0.865 - barH / 2;
+    ctx.fillStyle = "rgba(0,0,0,0.55)"; ctx.fillRect(14, barY, W - 28, barH);
+    let x = W / 2 - total / 2;
+    ctx.textAlign = "left"; ctx.textBaseline = "middle";
+    words.forEach((w, wi) => {
+      const wUp = w.toUpperCase();
+      const wObj = lineWords[wi];
+      const sung = wObj ? (t >= wObj.t) : (age / Math.max(0.1, life)) > (wi / Math.max(1, words.length));
+      const isCur = wObj ? (t >= wObj.t && (wi === lineWords.length - 1 || t < (lineWords[wi + 1] || {}).t)) : false;
+      ctx.fillStyle = sung ? "#ffd23e" : "rgba(255,255,255,0.5)";
+      if (isCur) { ctx.shadowColor = "rgba(255,210,62,0.9)"; ctx.shadowBlur = 14 * glowF + 6; } else ctx.shadowBlur = 0;
+      ctx.fillText(wUp, x, H * 0.865);
+      x += widths[wi] + spW;
+    });
+    ctx.restore(); return;
+  }
+  if (style === "typewriter") {
+    const L = currentOf(S.lineTimes, t, 2.4); if (!L) { ctx.restore(); return; }
+    const age = t - L.t;
+    const n = Math.max(0, Math.min(L.line.length, Math.floor(age / 0.05)));
+    if (!n) { ctx.restore(); return; }
+    ctx.font = "600 44px 'Courier New', monospace"; ctx.fillStyle = "rgba(255,255,255,0.92)";
+    ctx.shadowColor = "rgba(0,0,0,0.6)"; ctx.shadowBlur = 8;
+    ctx.fillText(L.line.slice(0, n) + (age % 0.8 < 0.45 ? "|" : ""), W / 2, H * 0.52);
+    ctx.restore(); return;
+  }
+  const wd = currentOf(S.wordTimes, t, 0.6); if (!wd) { ctx.restore(); return; }
+  const age = t - wd.t, word = wd.word.toUpperCase();
+  if (style !== "wordcards" && age > Math.min(wd.end - wd.t, 0.55) + 0.12) { ctx.restore(); return; }
+  if (style === "wordcards") {
+    if (age < 0.42) {
+      ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
+      fitFont(word, "700", W - 70, 120);
+      ctx.font = ctx.font.replace("system-ui", "Georgia, 'Times New Roman', serif");
+      ctx.fillStyle = "#ff2020"; ctx.fillText(word, W / 2, H / 2);
+    }
+    ctx.restore(); return;
+  }
+  if (style === "vertical") {
+    const vw = wd.word.toUpperCase();
+    const vsize = Math.min(120, (H * 0.62) / Math.max(1, vw.length));
+    ctx.font = "900 " + vsize + "px system-ui, 'Arial Black', sans-serif";
+    ctx.fillStyle = "#ffffff"; ctx.shadowColor = "rgba(20,200,190,0.8)"; ctx.shadowBlur = 12 * glowF + 4;
+    ctx.globalAlpha = Math.min(1, age / 0.15);
+    [...vw].forEach((ch, ci) => ctx.fillText(ch, W * 0.85, H * 0.2 + ci * vsize * 0.98));
+    ctx.restore(); return;
+  }
+  let scale = 1, rot = 0, yOff = 0, flipY = 1;
+  if (style === "wordpop") { if (((wd.ln || 0) + ((S.seed || 0) % 2)) % 2 === 1) { const k = Math.min(1, age / 0.16); scale = 2.3 - 1.3 * (1 - Math.pow(1 - k, 2)); yOff = (1 - k) * -14; } else { const k = Math.min(1, age / 0.13); scale = 0.55 + 0.45 * (1 - Math.pow(1 - k, 3)) + Math.max(0, 1 - age * 2.4) * 0.13; } }
+  if (style === "wordrotate") { const k = Math.min(1, age / 0.2); rot = (1 - k) * -0.5; scale = 0.7 + 0.3 * k; yOff = (1 - k) * 34; }
+  if (style === "wordslam") { const k = Math.min(1, age / 0.16); scale = 2.3 - 1.3 * (1 - Math.pow(1 - k, 2)); yOff = (1 - k) * -14; }
+  if (style === "wordflip") { const k = Math.min(1, age / 0.22); flipY = Math.max(0.06, Math.sin(k * Math.PI / 2)); scale = 0.75 + 0.25 * k; rot = (1 - k) * 0.12; }
+  if (style === "neon") { const k = Math.min(1, age / 0.14); scale = 0.6 + 0.4 * (1 - Math.pow(1 - k, 3)); }
+  if (style === "flicker") { const k = Math.min(1, age / 0.12); scale = 1.6 - 0.6 * k; ctx.globalAlpha = Math.random() < 0.22 ? 0.3 : 1; }
+  const size = fitFont(word, "900", W - 80, 118);
+  ctx.translate(W / 2, H * 0.68 + yOff); ctx.rotate(rot); ctx.scale(scale, scale * flipY);
+  ctx.font = "900 " + size + "px system-ui, 'Arial Black', sans-serif";
+  ctx.lineWidth = Math.max(6, size / 9); ctx.strokeStyle = "rgba(0,0,0,0.88)"; ctx.lineJoin = "round";
+  ctx.strokeText(word, 0, 0);
+  const grad = ctx.createLinearGradient(0, -size / 2, 0, size / 2);
+  grad.addColorStop(0, "#ffffff"); grad.addColorStop(0.55, "#ffe259"); grad.addColorStop(1, "#ffa751");
+  ctx.fillStyle = effPreset() === "dreamy" ? "#fff" : grad;
+  if (style === "neon") { ctx.fillStyle = "#eaffff"; ctx.shadowColor = "rgba(0,229,255,0.95)"; ctx.shadowBlur = 26 * glowF + 16; }
+  ctx.shadowColor = "rgba(0,0,0,0.45)"; ctx.shadowBlur = 10 * glowF;
+  ctx.fillText(word, 0, 0);
+  ctx.restore();
+}
+const _drawFrameInner = drawFrame;
+drawFrame = function (t) {
+  const sx = canvas.width / W, sy = canvas.height / H;
+  ctx.setTransform(sx, 0, 0, sy, 0, 0);
+  try { _drawFrameInner(t); } finally { ctx.setTransform(1, 0, 0, 1, 0, 0); }
+};
+
+/* ---------------- playback (robust loop) ---------------- */
+let rafId = null;
+function loop() {
+  if (!S.playing && !S.exporting) return;
+  rafId = requestAnimationFrame(loop); // schedule first: one bad frame can never freeze the edit
+  try { drawFrame(songEl.currentTime); } catch (err) {
+    if (!S.errShown) { S.errShown = true; setStatus("⚠️ A frame glitched in the preview — press Play again. (" + (err && err.message ? err.message : "error") + ")"); }
+  }
+  const ct = songEl.currentTime;
+  $("timeLabel").textContent = Math.max(0, ct - S.t0).toFixed(1) + "s / " + (S.t1 - S.t0).toFixed(1) + "s";
+  try { drawTimelineStrip(); } catch (_) {}
+  if (ct >= S.t1 - 0.03 && !S.exporting) stopPlay();
+}
+function stopPlay() {
+  S.playing = false; songEl.pause(); S.clips.forEach(c => { try { c.el.pause(); } catch(_){} });
+  $("btnPlay").textContent = "▶"; if (rafId) cancelAnimationFrame(rafId);
+}
+$("btnPlay").addEventListener("click", async () => {
+  if (!S.songBuf) return;
+  ensureTimeline();
+  if (S.playing) { stopPlay(); return; }
+  if (songEl.currentTime < S.t0 || songEl.currentTime >= S.t1 - 0.05) { try { songEl.currentTime = S.t0; } catch(_){} }
+  S.playing = true; S.errShown = false; $("btnPlay").textContent = "⏸";
+  try { await songEl.play(); } catch(_){}
+  loop();
+});
+songEl.addEventListener("ended", () => { if (!S.exporting) stopPlay(); });
+
+/* ---------------- auto edit ---------------- */
+$("btnAuto").addEventListener("click", () => {
+  if (!S.songBuf) return;
+  ensureTimeline();
+  setStatus("⚡ Auto Edit ready — " + S.segments.length + " cuts placed on the beat. Press Play to watch!");
+  window.scrollTo({ top: 0, behavior: "smooth" });
+  if (!S.playing) $("btnPlay").click();
+});
+
+/* ---------------- export ---------------- */
+function pickMime() {
+  const cands = ["video/mp4;codecs=avc1.42E01E,mp4a.40.2", "video/mp4", "video/webm;codecs=vp9,opus", "video/webm"];
+  for (const c of cands) { try { if (window.MediaRecorder && MediaRecorder.isTypeSupported(c)) return c; } catch(_){} }
+  return "";
+}
+$("btnExportTop").addEventListener("click", () => { $("btnExport").click(); });
+$("btnExport").addEventListener("click", async () => {
+  if (!S.songBuf || S.exporting) return;
+  stopPlay();
+  const size = parseInt($("qSize").value, 10);
+  if (W >= H) { canvas.height = size === 1080 ? 1080 : 720; canvas.width = Math.round(canvas.height * W / H); }
+  else { canvas.width = size; canvas.height = Math.round(size * H / W); }
+  let streamDest = null;
+  try {
+    if (!S.audioGraph) {
+      const actx = new (window.AudioContext || window.webkitAudioContext)();
+      const src = actx.createMediaElementSource(songEl);
+      const dest = actx.createMediaStreamDestination();
+      src.connect(actx.destination); src.connect(dest);
+      S.audioGraph = { actx, dest };
+    }
+    streamDest = S.audioGraph.dest;
+    if (S.audioGraph.actx.state === "suspended") await S.audioGraph.actx.resume();
+  } catch (e) { streamDest = null; }
+  const tracks = [...canvas.captureStream(30).getVideoTracks()];
+  if (streamDest) tracks.push(...streamDest.stream.getAudioTracks());
+  const mime = pickMime();
+  let rec;
+  try { rec = new MediaRecorder(new MediaStream(tracks), mime ? { mimeType: mime, videoBitsPerSecond: 8_000_000 } : { videoBitsPerSecond: 8_000_000 }); }
+  catch (e) { setStatus("❌ This browser doesn't support video export — try Chrome."); canvas.width = W; canvas.height = H; return; }
+  const chunks = [];
+  rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+  rec.onstop = () => {
+    const isMp4 = (rec.mimeType || "").includes("mp4");
+    const blob = new Blob(chunks, { type: isMp4 ? "video/mp4" : "video/webm" });
+    const url = URL.createObjectURL(blob);
+    const fname = "beatcut-video." + (isMp4 ? "mp4" : "webm");
+    const a = document.createElement("a");
+    a.href = url; a.download = fname; a.click();
+    const dl = $("dlLink"); dl.href = url; dl.download = fname; dl.style.display = "block";
+    dl.textContent = "⬇ Download from here — your video is ready (" + (isMp4 ? "MP4" : "WebM") + ")";
+    setTimeout(() => URL.revokeObjectURL(url), 600000);
+    S.exporting = false; $("btnExport").disabled = false; $("btnExportTop").disabled = false; $("btnPlay").disabled = false;
+    canvas.width = W; canvas.height = H; buildTimeline(); drawFrame(previewT());
+    setStatus("✅ Done! Your video is ready — download it from the green button below the preview.");
+  };
+  buildTimeline();
+  S.exporting = true; $("btnExport").disabled = true; $("btnExportTop").disabled = true; $("btnPlay").disabled = true;
+  try { songEl.currentTime = S.t0; } catch(_){}
+  setStatus("🎬 Rendering your video… keep this tab open, the song will play fully.");
+  rec.start(250);
+  try { await songEl.play(); } catch(_){}
+  loop();
+  const watcher = setInterval(() => {
+    if (!S.exporting) { clearInterval(watcher); return; }
+    if (songEl.currentTime >= S.t1 - 0.03 || songEl.ended) {
+      clearInterval(watcher);
+      setTimeout(() => { if (rec.state !== "inactive") rec.stop(); S.clips.forEach(c => { try { c.el.pause(); } catch(_){} }); }, 300);
+    }
+  }, 200);
+});
+
+/* ---------------- wiring ---------------- */
+document.querySelectorAll("#presets .chip").forEach(b => b.addEventListener("click", () => {
+  document.querySelectorAll("#presets .chip").forEach(x => x.classList.remove("on"));
+  b.classList.add("on"); S.preset = b.dataset.preset;
+  if (S.songBuf) { buildTimeline(); if (!S.playing) drawFrame(previewT()); }
+}));
+$("cutRate").addEventListener("change", () => { if (S.songBuf) { buildTimeline(); } });
+
+/* ---------------- segment editor (haath se badlaav) ---------------- */
+function fxOn(id, ov) { return ov != null ? !!ov : $(id).checked; }
+function selSegObj() { return (S.selSeg >= 0 && S.segments[S.selSeg]) ? S.segments[S.selSeg] : null; }
+function reindexSegs() { S.segments.forEach((s, i) => { s.idx = i; }); S.lastSegIdx = -1; }
+function syncSegUI() {
+  const sg = selSegObj(), info = $("segInfo");
+  const sc = $("segClip");
+  const n = S.clips.length || S.photos.length;
+  const kind = S.clips.length ? "Clip" : "Photo";
+  let opts = '<option value="-1">Auto (round-robin)</option>';
+  for (let i = 0; i < n; i++) opts += '<option value="' + i + '">' + kind + " " + (i + 1) + "</option>";
+  sc.innerHTML = opts;
+  if (!sg) { info.textContent = "No part selected yet. Tap the timeline above."; return; }
+  info.textContent = "Selected part: Segment " + (sg.idx + 1) + " · " + sg.start.toFixed(1) + "s – " + sg.end.toFixed(1) + "s · " + kind + " " + (((sg.clipIdx != null ? sg.clipIdx : sg.idx) % Math.max(1, n)) + 1);
+  sc.value = sg.clipIdx != null ? String(sg.clipIdx) : "-1";
+  $("segSpeed").value = sg.mRate != null ? String(sg.mRate) : "";
+  $("segTrans").value = sg.mTr != null ? sg.mTr : "";
+  $("segZoom").value = sg.mZoom != null ? String(sg.mZoom) : "";
+  [["segFxGlitch", "mFxGlitch"], ["segFxShake", "mFxShake"], ["segFxFlash", "mFxFlash"], ["segFxZoom", "mFxZoom"], ["segFxStickers", "mFxStickers"], ["segFxBlur", "mFxBlur"]].forEach(([id, k]) => { $(id).value = sg[k] != null ? (sg[k] ? "on" : "off") : ""; });
+}
+function seekTo(t) {
+  t = Math.min(Math.max(t, S.t0), S.t1 - 0.05);
+  try { songEl.currentTime = t; } catch (_) {}
+  $("timeLabel").textContent = Math.max(0, t - S.t0).toFixed(1) + "s / " + (S.t1 - S.t0).toFixed(1) + "s";
+  if (!S.playing) drawFrame(t + 0.02);
+  drawTimelineStrip();
+}
+const tlC = $("timeline");
+let tlDrag = null;
+function tlPos(e) { const r = tlC.getBoundingClientRect(); return { x: (e.clientX - r.left) * (tlC.width / Math.max(1, r.width)), y: (e.clientY - r.top) * (tlC.height / Math.max(1, r.height)) }; }
+tlC.addEventListener("pointerdown", e => {
+  if (!S.segments.length) return;
+  const gm = tlGeom(), p = tlPos(e), t = gm.v0 + ((p.x - gm.GUT) / gm.RW) * gm.vSpan;
+  try { tlC.setPointerCapture(e.pointerId); } catch (_) {}
+  if (p.y < 32 * gm.s) { tlDrag = { mode: "seek" }; S.drag = tlDrag; seekTo(t); return; }
+  const i = S.segments.findIndex(sg => t >= sg.start && t < sg.end);
+  if (i < 0) return;
+  S.selSeg = i; syncSegUI();
+  const sg = S.segments[i], edge = 11 * gm.s;
+  const xL = gm.GUT + (sg.start - gm.v0) / gm.vSpan * gm.RW, xR = gm.GUT + (sg.end - gm.v0) / gm.vSpan * gm.RW;
+  if (i > 0 && Math.abs(p.x - xL) <= edge) tlDrag = { mode: "trimL", i };
+  else if (i < S.segments.length - 1 && Math.abs(p.x - xR) <= edge) tlDrag = { mode: "trimR", i };
+  else tlDrag = { mode: "move", i, target: i };
+  S.drag = tlDrag; drawTimelineStrip();
+});
+tlC.addEventListener("pointermove", e => {
+  const gm = tlGeom(), p = tlPos(e), t = gm.v0 + ((p.x - gm.GUT) / gm.RW) * gm.vSpan;
+  if (!tlDrag) {
+    const i = S.segments.findIndex(sg => t >= sg.start && t < sg.end);
+    if (i >= 0 && p.y >= 32 * gm.s) { const sg = S.segments[i], edge = 11 * gm.s; const xL = gm.GUT + (sg.start - gm.v0) / gm.vSpan * gm.RW, xR = gm.GUT + (sg.end - gm.v0) / gm.vSpan * gm.RW; tlC.style.cursor = (Math.abs(p.x - xL) <= edge || Math.abs(p.x - xR) <= edge) ? "ew-resize" : "grab"; }
+    return;
+  }
+  if (tlDrag.mode === "seek") { seekTo(t); return; }
+  if (tlDrag.mode === "trimL") { const sg = S.segments[tlDrag.i], pv = S.segments[tlDrag.i - 1]; if (pv) { const nt = Math.round(Math.min(Math.max(t, pv.start + 0.15), sg.end - 0.15) * 100) / 100; pv.end = nt; sg.start = nt; } }
+  else if (tlDrag.mode === "trimR") { const sg = S.segments[tlDrag.i], nx = S.segments[tlDrag.i + 1]; if (nx) { const nt = Math.round(Math.max(Math.min(t, nx.end - 0.15), sg.start + 0.15) * 100) / 100; sg.end = nt; nx.start = nt; } }
+  else if (tlDrag.mode === "move") { const j = S.segments.findIndex(sg => t >= sg.start && t < sg.end); if (j >= 0) tlDrag.target = j; }
+  S.drag = tlDrag; drawTimelineStrip();
+});
+tlC.addEventListener("pointerup", () => {
+  if (!tlDrag) return;
+  const d = tlDrag; tlDrag = null; S.drag = null;
+  if (d.mode === "move" && d.target != null && d.target !== d.i) {
+    const A = S.segments[d.i], B = S.segments[d.target];
+    ["clipIdx", "zAmt", "rate", "dir", "kb", "tr", "mRate", "mTr", "mZoom", "srcStart", "mFxGlitch", "mFxShake", "mFxFlash", "mFxZoom", "mFxStickers", "mFxBlur"].forEach(k => { const tmp = A[k]; A[k] = B[k]; B[k] = tmp; });
+    S.selSeg = d.target; S.lastSegIdx = -1;
+    setStatus("Move done — two parts swapped places on the timeline.");
+  } else if (d.mode === "trimL" || d.mode === "trimR") {
+    S.lastSegIdx = -1; setStatus("Trim done — part length changed. Neighbour adjusted with it.");
+  } else if (d.mode === "move" && !S.playing && S.songBuf) {
+    seekTo(S.segments[d.i].start + 0.02);
+  }
+  syncSegUI(); drawTimelineStrip();
+});
+$("tlZoom").addEventListener("input", () => {
+  S.tlZoom = parseFloat($("tlZoom").value) || 1;
+  const span = Math.max(0.01, S.t1 - S.t0), vSpan = span / S.tlZoom;
+  S.viewT0 = Math.min(Math.max(previewT() - vSpan / 2, S.t0), S.t1 - vSpan);
+  drawTimelineStrip();
+});
+$("segClip").addEventListener("change", () => { const sg = selSegObj(); if (!sg) return; const v = parseInt($("segClip").value, 10); sg.clipIdx = v >= 0 ? v : undefined; syncSegUI(); if (!S.playing) drawFrame(previewT()); });
+$("segSpeed").addEventListener("change", () => { const sg = selSegObj(); if (!sg) return; const v = $("segSpeed").value; sg.mRate = v === "" ? undefined : parseFloat(v); });
+$("segTrans").addEventListener("change", () => { const sg = selSegObj(); if (!sg) return; const v = $("segTrans").value; sg.mTr = v === "" ? undefined : v; if (!S.playing) drawFrame(previewT()); });
+$("segZoom").addEventListener("change", () => { const sg = selSegObj(); if (!sg) return; const v = $("segZoom").value; sg.mZoom = v === "" ? undefined : parseFloat(v); if (!S.playing) drawFrame(previewT()); });
+[["segFxGlitch", "mFxGlitch"], ["segFxShake", "mFxShake"], ["segFxFlash", "mFxFlash"], ["segFxZoom", "mFxZoom"], ["segFxStickers", "mFxStickers"], ["segFxBlur", "mFxBlur"]].forEach(([id, k]) => {
+  $(id).addEventListener("change", () => { const sg = selSegObj(); if (!sg) return; const v = $(id).value; sg[k] = v === "" ? undefined : v === "on"; if (!S.playing) drawFrame(previewT()); });
+});
+$("btnSegSplit").addEventListener("click", () => {
+  const sg = selSegObj(); if (!sg) { setStatus("First tap the timeline to select a part."); return; }
+  if (sg.end - sg.start < 0.24) { setStatus("This part is too small to split further."); return; }
+  const mid = Math.round(((sg.start + sg.end) / 2) * 100) / 100;
+  const nu = { start: mid, end: sg.end, idx: sg.idx + 1, zAmt: sg.zAmt, rate: sg.rate, dir: sg.dir, kb: sg.kb, tr: sg.tr, clipIdx: sg.clipIdx, mRate: sg.mRate, mTr: sg.mTr, mZoom: sg.mZoom, srcStart: sg.srcStart != null ? sg.srcStart + (mid - sg.start) : undefined, mFxGlitch: sg.mFxGlitch, mFxShake: sg.mFxShake, mFxFlash: sg.mFxFlash, mFxZoom: sg.mFxZoom, mFxStickers: sg.mFxStickers, mFxBlur: sg.mFxBlur };
+  sg.end = mid;
+  S.segments.splice(sg.idx + 1, 0, nu); reindexSegs(); S.selSeg = sg.idx + 1;
+  syncSegUI(); drawTimelineStrip(); setStatus("✂ Part split in the middle — now " + S.segments.length + " parts in total.");
+});
+$("btnSegSplitPlay").addEventListener("click", () => {
+  const t = Math.round(previewT() * 100) / 100;
+  const sg = S.segments.find(x => t > x.start + 0.12 && t < x.end - 0.12);
+  if (!sg) { setStatus("The playhead is not inside a part with room to split. Click the ruler to move the playhead into the middle of a part first."); return; }
+  const nu = { start: t, end: sg.end, idx: sg.idx + 1, zAmt: sg.zAmt, rate: sg.rate, dir: sg.dir, kb: sg.kb, tr: sg.tr, clipIdx: sg.clipIdx, mRate: sg.mRate, mTr: sg.mTr, mZoom: sg.mZoom, srcStart: sg.srcStart != null ? sg.srcStart + (t - sg.start) : undefined, mFxGlitch: sg.mFxGlitch, mFxShake: sg.mFxShake, mFxFlash: sg.mFxFlash, mFxZoom: sg.mFxZoom, mFxStickers: sg.mFxStickers, mFxBlur: sg.mFxBlur };
+  sg.end = t;
+  S.segments.splice(sg.idx + 1, 0, nu); reindexSegs(); S.selSeg = sg.idx + 1;
+  syncSegUI(); drawTimelineStrip(); setStatus("✂ Split at the playhead — now " + S.segments.length + " parts in total.");
+});
+$("btnSegDel").addEventListener("click", () => {
+  const sg = selSegObj(); if (!sg) { setStatus("First tap the timeline to select a part."); return; }
+  if (S.segments.length <= 1) { setStatus("Only one part left — it can't be deleted."); return; }
+  const i = sg.idx;
+  if (i > 0) S.segments[i - 1].end = sg.end; else S.segments[1].start = sg.start;
+  S.segments.splice(i, 1); reindexSegs(); S.selSeg = Math.min(i, S.segments.length - 1);
+  syncSegUI(); drawTimelineStrip(); setStatus("🗑 Part deleted — now " + S.segments.length + " parts in total.");
+});
+function onTrim() {
+  let a = parseFloat($("trimStart").value), b = parseFloat($("trimEnd").value);
+  if (b - a < 1) { if (event && event.target === $("trimStart")) a = b - 1; else b = a + 1; }
+  S.t0 = Math.max(0, a); S.t1 = Math.min(S.duration || b, b);
+  $("trimStartVal").textContent = S.t0.toFixed(1) + "s"; $("trimEndVal").textContent = S.t1.toFixed(1) + "s";
+  if (S.songBuf) buildTimeline();
+}
+$("trimStart").addEventListener("input", onTrim);
+$("trimEnd").addEventListener("input", onTrim);
+$("lyrics").addEventListener("change", () => { if (S.songBuf) buildTimeline(); });
+[["mZoom","%"],["mShake","%"],["mGlow","%"],["mBlur","px"],["mBri","%"],["mCon","%"],["mSat","%"],["mRot","°"],["mSpd","%"]].forEach(([id, u]) => {
+  const el = $(id), out = $(id + "Val");
+  const upd = () => { out.textContent = el.value + u; if (S.songBuf && !S.playing) drawFrame(previewT()); };
+  el.addEventListener("input", upd); upd();
+});
+$("mTrans").addEventListener("change", () => { if (S.songBuf && !S.playing) drawFrame(previewT()); });
+["fxGlitch","fxShake","fxFlash","fxZoom","fxStickers","fxVignette","fxBlur","fxStreak","fxBars","qEnhance","qSharp","textStyle","hookText","watermark"].forEach(id =>
+  $(id).addEventListener("change", () => { if (S.songBuf && !S.playing) drawFrame(previewT()); }));
+$("fmtSize").addEventListener("change", () => {
+  const v = $("fmtSize").value;
+  if (v === "45") { W = 864; H = 1080; }
+  else if (v === "11") { W = 900; H = 900; }
+  else if (v === "169") { W = 1280; H = 720; }
+  else { W = 720; H = 1280; }
+  canvas.width = W; canvas.height = H; S._lf = null;
+  canvas.style.aspectRatio = W + " / " + H;
+  canvas.style.maxWidth = W > H ? "560px" : (W === H ? "400px" : "330px");
+  if (S.songBuf) drawFrame(previewT());
+  setStatus("Video size set: " + W + " × " + H + ".");
+});
+$("tbExport").addEventListener("click", e => { e.preventDefault(); $("btnExport").click(); });
+$("tbImport").addEventListener("click", e => { e.preventDefault(); document.querySelector(".cardMedia").scrollIntoView({ behavior: "smooth", block: "start" }); });
+ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
+ctx.fillStyle = "#3d4666"; ctx.font = "700 44px system-ui"; ctx.textAlign = "center";
+ctx.fillText("🎬 BeatCut Studio", W / 2, H / 2 - 20);
+ctx.font = "400 30px system-ui"; ctx.fillStyle = "#8a93ad";
+ctx.fillText("Add a clip and a song below", W / 2, H / 2 + 30);
+</script>
+</body>
+</html>
