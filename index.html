@@ -147,6 +147,15 @@
     <select id="segZoom">
       <option value="">Auto</option><option value="0">Off</option><option value="0.7">Light</option><option value="1">Normal</option><option value="1.6">Strong</option>
     </select>
+    <label class="f">Effects on the selected part — set them yourself</label>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
+      <select id="segFxGlitch"><option value="">Glitch: Auto</option><option value="on">Glitch: ON</option><option value="off">Glitch: OFF</option></select>
+      <select id="segFxShake"><option value="">Shake: Auto</option><option value="on">Shake: ON</option><option value="off">Shake: OFF</option></select>
+      <select id="segFxFlash"><option value="">Flash: Auto</option><option value="on">Flash: ON</option><option value="off">Flash: OFF</option></select>
+      <select id="segFxZoom"><option value="">Zoom FX: Auto</option><option value="on">Zoom FX: ON</option><option value="off">Zoom FX: OFF</option></select>
+      <select id="segFxStickers"><option value="">Stickers: Auto</option><option value="on">Stickers: ON</option><option value="off">Stickers: OFF</option></select>
+      <select id="segFxBlur"><option value="">Blur: Auto</option><option value="on">Blur: ON</option><option value="off">Blur: OFF</option></select>
+    </div>
     <div class="chips" style="margin-top:12px">
       <button class="chip" id="btnSegSplit" type="button">✂ Split in the middle</button>
       <button class="chip" id="btnSegSplitPlay" type="button">✂ Split at playhead</button>
@@ -171,6 +180,9 @@
       <label><input type="checkbox" id="fxZoom" checked> Zoom punch on cuts</label>
       <label><input type="checkbox" id="fxStickers" checked> Sparkle / heart stickers</label>
       <label><input type="checkbox" id="fxVignette" checked> Vignette</label>
+      <label><input type="checkbox" id="fxBlur" checked> Motion blur on hits</label>
+      <label><input type="checkbox" id="fxStreak" checked> Glow streaks on strong beats</label>
+      <label><input type="checkbox" id="fxBars"> Cinematic black bars (letterbox)</label>
     </div>
     <label class="f">Quality</label>
     <div class="checks">
@@ -179,8 +191,15 @@
     </div>
     <label class="f">Export size</label>
     <select id="qSize">
-      <option value="720">720 × 1280 (fast)</option>
-      <option value="1080">1080 × 1920 HD (slower)</option>
+      <option value="720">Standard (fast)</option>
+      <option value="1080">HD (slower)</option>
+    </select>
+    <label class="f">Video size / shape</label>
+    <select id="fmtSize">
+      <option value="916">9:16 Vertical — Reels / Shorts (720 × 1280)</option>
+      <option value="45">4:5 Portrait — Instagram feed (864 × 1080)</option>
+      <option value="11">1:1 Square — Instagram post (900 × 900)</option>
+      <option value="169">16:9 Wide — YouTube (1280 × 720)</option>
     </select>
   </div>
 
@@ -188,17 +207,23 @@
     <h2>4 · Text / lyrics</h2>
     <label class="f">Big opening text (hook) — can be left empty</label>
     <input type="text" id="hookText" placeholder="e.g. LADDO RANI 🔥">
-    <label class="f">Lyrics — one line per line</label>
+    <label class="f">Lyrics / spoken words — one line per line (auto-synced to the voice)</label>
     <textarea id="lyrics" placeholder="type your first line here
 second line goes here
 third line here"></textarea>
     <label class="f">Text style</label>
     <select id="textStyle">
-      <option value="wordpop">Word by word — big pop (funk)</option>
+      <option value="captions">Captions — karaoke subtitles (words light up as they are sung)</option>
+      <option value="wordpop" selected>Word by word — big pop (funk)</option>
       <option value="wordcards">Word cards — red letters, black screen</option>
       <option value="wordrotate">Word by word — spin-in entry</option>
       <option value="wordslam">Word by word — slam (big → small)</option>
       <option value="linefade">Line by line — soft fade</option>
+      <option value="wordflip">Word by word — flip in</option>
+      <option value="neon">Neon glow words</option>
+      <option value="flicker">Flicker words (glitch text)</option>
+      <option value="typewriter">Typewriter — letter by letter</option>
+      <option value="vertical">Vertical words — tall side text</option>
     </select>
     <label class="f">Small name in the corner (watermark, optional)</label>
     <input type="text" id="watermark" placeholder="e.g. your channel name">
@@ -234,7 +259,7 @@ third line here"></textarea>
 "use strict";
 const $ = id => document.getElementById(id);
 const canvas = $("stage"), ctx = canvas.getContext("2d");
-const W = 720, H = 1280;
+let W = 720, H = 1280;
 const songEl = $("songEl");
 
 const S = {
@@ -336,6 +361,23 @@ function analyseBeats() {
   let max = 0; beats.forEach(b => { if (b.s > max) max = b.s; });
   beats.forEach(b => { b.s = max ? Math.pow(b.s / max, 0.7) : 0; });
   if (beats.length < 4) { for (let t = 0.25; t < S.duration; t += 0.5) beats.push({ t, s: 0.5 }); }
+  // vocal/syllable onsets: full-band energy attacks — the voice lives here; lyric words snap to these
+  const hop2 = 256, win2 = 1024, n2 = Math.floor((data.length - win2) / hop2);
+  const env2 = new Float32Array(Math.max(0, n2));
+  for (let k = 0; k < n2; k++) { let sm = 0; const off = k * hop2; for (let i = 0; i < win2; i += 8) { const v = data[off + i]; sm += v * v; } env2[k] = sm; }
+  const vocal = []; let lastV = -1;
+  for (let k = 2; k < n2 - 2; k++) {
+    const f = env2[k] - env2[k - 1]; if (f <= 0) continue;
+    if (f < env2[k - 1] - env2[k - 2] || f < env2[k + 1] - env2[k]) continue;
+    let mean = 0, cnt = 0;
+    for (let j = Math.max(1, k - 60); j < Math.min(n2, k + 60); j++) { const d = env2[j] - env2[j - 1]; if (d > 0) { mean += d; cnt++; } }
+    mean = cnt ? mean / cnt : 0;
+    const tv = k * hop2 / sr;
+    if (f > mean * 2.2 && tv - lastV > 0.13) { vocal.push({ t: tv, s: f }); lastV = tv; }
+  }
+  let vmax = 0; vocal.forEach(v => { if (v.s > vmax) vmax = v.s; });
+  vocal.forEach(v => { v.s = vmax ? v.s / vmax : 0; });
+  S.vocal = vocal;
   S.beats = beats;
   let bpm = 0;
   if (beats.length > 2) { const gaps = []; for (let i = 1; i < beats.length; i++) gaps.push(beats[i].t - beats[i-1].t); gaps.sort((x, y) => x - y); bpm = Math.round(60 / gaps[Math.floor(gaps.length / 2)]); }
@@ -404,6 +446,13 @@ function buildTimeline() {
       line.split(/\s+/).filter(Boolean).forEach(w => { if (bi < use.length) { S.wordTimes.push({ word: w, t: use[bi].t, ln: li }); bi++; } });
     });
     pass++;
+  }
+  if (S.vocal && S.vocal.length >= 4) {
+    const snap = (tt, win) => { let best = null, bd = win; for (const v of S.vocal) { const d = Math.abs(v.t - tt); if (d < bd) { bd = d; best = v.t; } } return best != null ? best : tt; };
+    S.lineTimes.forEach(L => { L.t = snap(L.t, 0.4); });
+    S.lineTimes.sort((a, b) => a.t - b.t);
+    let prev = -1;
+    S.wordTimes.forEach(wd => { let nt = snap(wd.t, 0.3); if (nt <= prev + 0.05) nt = wd.t > prev + 0.05 ? wd.t : prev + 0.06; wd.t = Math.round(nt * 100) / 100; prev = wd.t; });
   }
   S.lastBeatIdx = -1; S.lastSegIdx = -1; S.particles = [];
   drawTimelineStrip();
@@ -530,10 +579,10 @@ function drawFrame(rawT) {
   if (bIdx !== S.lastBeatIdx) {
     S.lastBeatIdx = bIdx;
     if (beat && beat.s > 0.55) {
-      if ($("fxFlash").checked) S.flash = Math.max(S.flash, beat.s * 0.85);
-      if ($("fxStickers").checked && P.stickers !== "none") spawnParticles(beat.s > 0.8 ? 6 : 3, P.stickers);
+      if (fxOn("fxFlash", seg.mFxFlash)) S.flash = Math.max(S.flash, beat.s * 0.85);
+      if (fxOn("fxStickers", seg.mFxStickers) && P.stickers !== "none") spawnParticles(beat.s > 0.8 ? 6 : 3, P.stickers);
     }
-    if (beat) S.shakeAmp = Math.max(S.shakeAmp, beat.s * 10 * P.shake * M.shake * ($("fxShake").checked ? 1 : 0));
+    if (beat) S.shakeAmp = Math.max(S.shakeAmp, beat.s * 10 * P.shake * M.shake * (fxOn("fxShake", seg.mFxShake) ? 1 : 0));
   }
   S.flash *= 0.82; S.shakeAmp *= 0.8;
   const shX = (Math.random() - 0.5) * 2 * S.shakeAmp, shY = (Math.random() - 0.5) * 2 * S.shakeAmp;
@@ -545,7 +594,7 @@ function drawFrame(rawT) {
   let f = P.grade + " brightness(" + M.bri + ") contrast(" + M.con + ") saturate(" + M.sat + ")" + (M.blur > 0 ? " blur(" + M.blur + "px)" : "");
   if ($("qEnhance").checked) f += " contrast(1.05) saturate(1.08)";
   try { ctx.filter = f; } catch(_){}
-  const punch = $("fxZoom").checked ? 1 + P.zoomPunch * M.zoom * (seg.mZoom != null ? seg.mZoom : (seg.zAmt || 1)) * Math.max(0, 1 - (t - seg.start) * 1.8) : 1;
+  const punch = fxOn("fxZoom", seg.mFxZoom) ? 1 + P.zoomPunch * M.zoom * (seg.mZoom != null ? seg.mZoom : (seg.zAmt || 1)) * Math.max(0, 1 - (t - seg.start) * 1.8) : 1;
   const m = mode();
 
   if (m === "clips") {
@@ -563,6 +612,7 @@ function drawFrame(rawT) {
       if (trv === "fade") ctx.globalAlpha = Math.min(1, 0.2 + segP * 3.2);
       drawCover(v, v.videoWidth, v.videoHeight, punch * (1 + (seg.kb > 0 ? segP : 1 - segP) * 0.24), panX + (seg.dir || 1) * segP * 34);
       ctx.globalAlpha = 1;
+      if (fxOn("fxBlur", seg.mFxBlur) && S._lf && (segP < 0.2 || pulse > 0.75)) { try { ctx.save(); ctx.globalAlpha = 0.3; ctx.drawImage(S._lf, 0, 0, W, H); ctx.restore(); } catch(_){} }
       try { const lc = S._lf || (S._lf = document.createElement("canvas")); if (lc.width !== canvas.width) { lc.width = canvas.width; lc.height = canvas.height; } lc.getContext("2d").drawImage(canvas, 0, 0); } catch(_){}
     } else if (S._lf) {
       try { ctx.drawImage(S._lf, 0, 0, W, H); } catch(_){}
@@ -603,7 +653,7 @@ function drawFrame(rawT) {
   }
   try { ctx.filter = "none"; } catch(_){}
 
-  const doGlitch = $("fxGlitch").checked && ((EP === "funk" && pulse > 0.55) || m === "song");
+  const doGlitch = fxOn("fxGlitch", seg.mFxGlitch) && ((EP === "funk" && pulse > 0.55) || m === "song");
   if (doGlitch) {
     const csx = canvas.width / W, csy = canvas.height / H;
     const slices = EP === "funk" ? 5 : 3;
@@ -621,6 +671,13 @@ function drawFrame(rawT) {
   if (S.flash > 0.02) { ctx.fillStyle = "rgba(255,255,255," + Math.min(0.9, S.flash) + ")"; ctx.fillRect(-30, -30, W + 60, H + 60); }
   ctx.restore();
 
+  if ($("fxStreak").checked && pulse > 0.55 && m !== "song") {
+    ctx.save(); ctx.globalCompositeOperation = "lighter";
+    const sa = (pulse - 0.55) * 0.45;
+    for (let i = 0; i < 3; i++) { const yy = ((i * 41 + Math.floor(t * 9) * 13) % 100) / 100 * H; const gr = ctx.createLinearGradient(0, yy, W, yy + 130); gr.addColorStop(0, "rgba(80,180,255,0)"); gr.addColorStop(0.5, "rgba(130,205,255," + sa + ")"); gr.addColorStop(1, "rgba(80,180,255,0)"); ctx.fillStyle = gr; ctx.fillRect(-30, yy, W + 60, 30); }
+    ctx.restore();
+  }
+  if ($("fxBars").checked) { ctx.fillStyle = "#000"; ctx.fillRect(-30, -30, W + 60, H * 0.1 + 30); ctx.fillRect(-30, H * 0.9, W + 60, H * 0.1 + 32); }
   drawText(t);
   if ($("fxVignette").checked) {
     const vg = ctx.createRadialGradient(W/2, H/2, H*0.32, W/2, H/2, H*0.72);
@@ -682,6 +739,43 @@ function drawText(t) {
     wrapText(L.line, W / 2, H * 0.8, W - 90, 62);
     ctx.restore(); return;
   }
+  if (style === "captions") {
+    const L = currentOf(S.lineTimes, t, 2.4); if (!L) { ctx.restore(); return; }
+    const age = t - L.t, life = L.end - L.t;
+    ctx.globalAlpha = Math.max(0, Math.min(1, age / 0.2) * (life - age < 0.35 ? Math.max(0, (life - age) / 0.35) : 1));
+    const lineWords = S.wordTimes.filter(w => w.t >= L.t - 0.02 && w.t < L.end);
+    const words = L.line.split(/\s+/).filter(Boolean);
+    const size = fitFont(L.line.toUpperCase(), "800", W - 90, 56);
+    ctx.font = "800 " + size + "px system-ui, sans-serif";
+    const widths = words.map(w => ctx.measureText(w.toUpperCase()).width);
+    const spW = ctx.measureText(" ").width;
+    const total = widths.reduce((a, b) => a + b, 0) + spW * Math.max(0, words.length - 1);
+    const barH = size * 1.7, barY = H * 0.865 - barH / 2;
+    ctx.fillStyle = "rgba(0,0,0,0.55)"; ctx.fillRect(14, barY, W - 28, barH);
+    let x = W / 2 - total / 2;
+    ctx.textAlign = "left"; ctx.textBaseline = "middle";
+    words.forEach((w, wi) => {
+      const wUp = w.toUpperCase();
+      const wObj = lineWords[wi];
+      const sung = wObj ? (t >= wObj.t) : (age / Math.max(0.1, life)) > (wi / Math.max(1, words.length));
+      const isCur = wObj ? (t >= wObj.t && (wi === lineWords.length - 1 || t < (lineWords[wi + 1] || {}).t)) : false;
+      ctx.fillStyle = sung ? "#ffd23e" : "rgba(255,255,255,0.5)";
+      if (isCur) { ctx.shadowColor = "rgba(255,210,62,0.9)"; ctx.shadowBlur = 14 * glowF + 6; } else ctx.shadowBlur = 0;
+      ctx.fillText(wUp, x, H * 0.865);
+      x += widths[wi] + spW;
+    });
+    ctx.restore(); return;
+  }
+  if (style === "typewriter") {
+    const L = currentOf(S.lineTimes, t, 2.4); if (!L) { ctx.restore(); return; }
+    const age = t - L.t;
+    const n = Math.max(0, Math.min(L.line.length, Math.floor(age / 0.05)));
+    if (!n) { ctx.restore(); return; }
+    ctx.font = "600 44px 'Courier New', monospace"; ctx.fillStyle = "rgba(255,255,255,0.92)";
+    ctx.shadowColor = "rgba(0,0,0,0.6)"; ctx.shadowBlur = 8;
+    ctx.fillText(L.line.slice(0, n) + (age % 0.8 < 0.45 ? "|" : ""), W / 2, H * 0.52);
+    ctx.restore(); return;
+  }
   const wd = currentOf(S.wordTimes, t, 0.6); if (!wd) { ctx.restore(); return; }
   const age = t - wd.t, word = wd.word.toUpperCase();
   if (style !== "wordcards" && age > (wd.end - wd.t) + 0.3) { ctx.restore(); return; }
@@ -694,18 +788,31 @@ function drawText(t) {
     }
     ctx.restore(); return;
   }
-  let scale = 1, rot = 0, yOff = 0;
+  if (style === "vertical") {
+    const vw = wd.word.toUpperCase();
+    const vsize = Math.min(120, (H * 0.62) / Math.max(1, vw.length));
+    ctx.font = "900 " + vsize + "px system-ui, 'Arial Black', sans-serif";
+    ctx.fillStyle = "#ffffff"; ctx.shadowColor = "rgba(20,200,190,0.8)"; ctx.shadowBlur = 12 * glowF + 4;
+    ctx.globalAlpha = Math.min(1, age / 0.15);
+    [...vw].forEach((ch, ci) => ctx.fillText(ch, W * 0.85, H * 0.2 + ci * vsize * 0.98));
+    ctx.restore(); return;
+  }
+  let scale = 1, rot = 0, yOff = 0, flipY = 1;
   if (style === "wordpop") { if (((wd.ln || 0) + ((S.seed || 0) % 2)) % 2 === 1) { const k = Math.min(1, age / 0.16); scale = 2.3 - 1.3 * (1 - Math.pow(1 - k, 2)); yOff = (1 - k) * -14; } else { const k = Math.min(1, age / 0.13); scale = 0.55 + 0.45 * (1 - Math.pow(1 - k, 3)) + Math.max(0, 1 - age * 2.4) * 0.13; } }
   if (style === "wordrotate") { const k = Math.min(1, age / 0.2); rot = (1 - k) * -0.5; scale = 0.7 + 0.3 * k; yOff = (1 - k) * 34; }
   if (style === "wordslam") { const k = Math.min(1, age / 0.16); scale = 2.3 - 1.3 * (1 - Math.pow(1 - k, 2)); yOff = (1 - k) * -14; }
+  if (style === "wordflip") { const k = Math.min(1, age / 0.22); flipY = Math.max(0.06, Math.sin(k * Math.PI / 2)); scale = 0.75 + 0.25 * k; rot = (1 - k) * 0.12; }
+  if (style === "neon") { const k = Math.min(1, age / 0.14); scale = 0.6 + 0.4 * (1 - Math.pow(1 - k, 3)); }
+  if (style === "flicker") { const k = Math.min(1, age / 0.12); scale = 1.6 - 0.6 * k; ctx.globalAlpha = Math.random() < 0.22 ? 0.3 : 1; }
   const size = fitFont(word, "900", W - 80, 118);
-  ctx.translate(W / 2, H * 0.68 + yOff); ctx.rotate(rot); ctx.scale(scale, scale);
+  ctx.translate(W / 2, H * 0.68 + yOff); ctx.rotate(rot); ctx.scale(scale, scale * flipY);
   ctx.font = "900 " + size + "px system-ui, 'Arial Black', sans-serif";
   ctx.lineWidth = Math.max(6, size / 9); ctx.strokeStyle = "rgba(0,0,0,0.88)"; ctx.lineJoin = "round";
   ctx.strokeText(word, 0, 0);
   const grad = ctx.createLinearGradient(0, -size / 2, 0, size / 2);
   grad.addColorStop(0, "#ffffff"); grad.addColorStop(0.55, "#ffe259"); grad.addColorStop(1, "#ffa751");
   ctx.fillStyle = effPreset() === "dreamy" ? "#fff" : grad;
+  if (style === "neon") { ctx.fillStyle = "#eaffff"; ctx.shadowColor = "rgba(0,229,255,0.95)"; ctx.shadowBlur = 26 * glowF + 16; }
   ctx.shadowColor = "rgba(0,0,0,0.45)"; ctx.shadowBlur = 10 * glowF;
   ctx.fillText(word, 0, 0);
   ctx.restore();
@@ -765,7 +872,8 @@ $("btnExport").addEventListener("click", async () => {
   if (!S.songBuf || S.exporting) return;
   stopPlay();
   const size = parseInt($("qSize").value, 10);
-  canvas.width = size; canvas.height = Math.round(size * 16 / 9);
+  if (W >= H) { canvas.height = size === 1080 ? 1080 : 720; canvas.width = Math.round(canvas.height * W / H); }
+  else { canvas.width = size; canvas.height = Math.round(size * H / W); }
   let streamDest = null;
   try {
     if (!S.audioGraph) {
@@ -825,6 +933,7 @@ document.querySelectorAll("#presets .chip").forEach(b => b.addEventListener("cli
 $("cutRate").addEventListener("change", () => { if (S.songBuf) { buildTimeline(); } });
 
 /* ---------------- segment editor (haath se badlaav) ---------------- */
+function fxOn(id, ov) { return ov != null ? !!ov : $(id).checked; }
 function selSegObj() { return (S.selSeg >= 0 && S.segments[S.selSeg]) ? S.segments[S.selSeg] : null; }
 function reindexSegs() { S.segments.forEach((s, i) => { s.idx = i; }); S.lastSegIdx = -1; }
 function syncSegUI() {
@@ -841,10 +950,12 @@ function syncSegUI() {
   $("segSpeed").value = sg.mRate != null ? String(sg.mRate) : "";
   $("segTrans").value = sg.mTr != null ? sg.mTr : "";
   $("segZoom").value = sg.mZoom != null ? String(sg.mZoom) : "";
+  [["segFxGlitch", "mFxGlitch"], ["segFxShake", "mFxShake"], ["segFxFlash", "mFxFlash"], ["segFxZoom", "mFxZoom"], ["segFxStickers", "mFxStickers"], ["segFxBlur", "mFxBlur"]].forEach(([id, k]) => { $(id).value = sg[k] != null ? (sg[k] ? "on" : "off") : ""; });
 }
 function seekTo(t) {
   t = Math.min(Math.max(t, S.t0), S.t1 - 0.05);
   try { songEl.currentTime = t; } catch (_) {}
+  $("timeLabel").textContent = Math.max(0, t - S.t0).toFixed(1) + "s / " + (S.t1 - S.t0).toFixed(1) + "s";
   if (!S.playing) drawFrame(t + 0.02);
   drawTimelineStrip();
 }
@@ -884,7 +995,7 @@ tlC.addEventListener("pointerup", () => {
   const d = tlDrag; tlDrag = null; S.drag = null;
   if (d.mode === "move" && d.target != null && d.target !== d.i) {
     const A = S.segments[d.i], B = S.segments[d.target];
-    ["clipIdx", "zAmt", "rate", "dir", "kb", "tr", "mRate", "mTr", "mZoom", "srcStart"].forEach(k => { const tmp = A[k]; A[k] = B[k]; B[k] = tmp; });
+    ["clipIdx", "zAmt", "rate", "dir", "kb", "tr", "mRate", "mTr", "mZoom", "srcStart", "mFxGlitch", "mFxShake", "mFxFlash", "mFxZoom", "mFxStickers", "mFxBlur"].forEach(k => { const tmp = A[k]; A[k] = B[k]; B[k] = tmp; });
     S.selSeg = d.target; S.lastSegIdx = -1;
     setStatus("Move done — two parts swapped places on the timeline.");
   } else if (d.mode === "trimL" || d.mode === "trimR") {
@@ -904,11 +1015,14 @@ $("segClip").addEventListener("change", () => { const sg = selSegObj(); if (!sg)
 $("segSpeed").addEventListener("change", () => { const sg = selSegObj(); if (!sg) return; const v = $("segSpeed").value; sg.mRate = v === "" ? undefined : parseFloat(v); });
 $("segTrans").addEventListener("change", () => { const sg = selSegObj(); if (!sg) return; const v = $("segTrans").value; sg.mTr = v === "" ? undefined : v; if (!S.playing) drawFrame(previewT()); });
 $("segZoom").addEventListener("change", () => { const sg = selSegObj(); if (!sg) return; const v = $("segZoom").value; sg.mZoom = v === "" ? undefined : parseFloat(v); if (!S.playing) drawFrame(previewT()); });
+[["segFxGlitch", "mFxGlitch"], ["segFxShake", "mFxShake"], ["segFxFlash", "mFxFlash"], ["segFxZoom", "mFxZoom"], ["segFxStickers", "mFxStickers"], ["segFxBlur", "mFxBlur"]].forEach(([id, k]) => {
+  $(id).addEventListener("change", () => { const sg = selSegObj(); if (!sg) return; const v = $(id).value; sg[k] = v === "" ? undefined : v === "on"; if (!S.playing) drawFrame(previewT()); });
+});
 $("btnSegSplit").addEventListener("click", () => {
   const sg = selSegObj(); if (!sg) { setStatus("First tap the timeline to select a part."); return; }
   if (sg.end - sg.start < 0.24) { setStatus("This part is too small to split further."); return; }
   const mid = Math.round(((sg.start + sg.end) / 2) * 100) / 100;
-  const nu = { start: mid, end: sg.end, idx: sg.idx + 1, zAmt: sg.zAmt, rate: sg.rate, dir: sg.dir, kb: sg.kb, tr: sg.tr, clipIdx: sg.clipIdx, mRate: sg.mRate, mTr: sg.mTr, mZoom: sg.mZoom, srcStart: sg.srcStart != null ? sg.srcStart + (mid - sg.start) : undefined };
+  const nu = { start: mid, end: sg.end, idx: sg.idx + 1, zAmt: sg.zAmt, rate: sg.rate, dir: sg.dir, kb: sg.kb, tr: sg.tr, clipIdx: sg.clipIdx, mRate: sg.mRate, mTr: sg.mTr, mZoom: sg.mZoom, srcStart: sg.srcStart != null ? sg.srcStart + (mid - sg.start) : undefined, mFxGlitch: sg.mFxGlitch, mFxShake: sg.mFxShake, mFxFlash: sg.mFxFlash, mFxZoom: sg.mFxZoom, mFxStickers: sg.mFxStickers, mFxBlur: sg.mFxBlur };
   sg.end = mid;
   S.segments.splice(sg.idx + 1, 0, nu); reindexSegs(); S.selSeg = sg.idx + 1;
   syncSegUI(); drawTimelineStrip(); setStatus("✂ Part split in the middle — now " + S.segments.length + " parts in total.");
@@ -917,7 +1031,7 @@ $("btnSegSplitPlay").addEventListener("click", () => {
   const t = Math.round(previewT() * 100) / 100;
   const sg = S.segments.find(x => t > x.start + 0.12 && t < x.end - 0.12);
   if (!sg) { setStatus("The playhead is not inside a part with room to split. Click the ruler to move the playhead into the middle of a part first."); return; }
-  const nu = { start: t, end: sg.end, idx: sg.idx + 1, zAmt: sg.zAmt, rate: sg.rate, dir: sg.dir, kb: sg.kb, tr: sg.tr, clipIdx: sg.clipIdx, mRate: sg.mRate, mTr: sg.mTr, mZoom: sg.mZoom, srcStart: sg.srcStart != null ? sg.srcStart + (t - sg.start) : undefined };
+  const nu = { start: t, end: sg.end, idx: sg.idx + 1, zAmt: sg.zAmt, rate: sg.rate, dir: sg.dir, kb: sg.kb, tr: sg.tr, clipIdx: sg.clipIdx, mRate: sg.mRate, mTr: sg.mTr, mZoom: sg.mZoom, srcStart: sg.srcStart != null ? sg.srcStart + (t - sg.start) : undefined, mFxGlitch: sg.mFxGlitch, mFxShake: sg.mFxShake, mFxFlash: sg.mFxFlash, mFxZoom: sg.mFxZoom, mFxStickers: sg.mFxStickers, mFxBlur: sg.mFxBlur };
   sg.end = t;
   S.segments.splice(sg.idx + 1, 0, nu); reindexSegs(); S.selSeg = sg.idx + 1;
   syncSegUI(); drawTimelineStrip(); setStatus("✂ Split at the playhead — now " + S.segments.length + " parts in total.");
@@ -946,8 +1060,20 @@ $("lyrics").addEventListener("change", () => { if (S.songBuf) buildTimeline(); }
   el.addEventListener("input", upd); upd();
 });
 $("mTrans").addEventListener("change", () => { if (S.songBuf && !S.playing) drawFrame(previewT()); });
-["fxGlitch","fxShake","fxFlash","fxZoom","fxStickers","fxVignette","qEnhance","qSharp","textStyle","hookText","watermark"].forEach(id =>
+["fxGlitch","fxShake","fxFlash","fxZoom","fxStickers","fxVignette","fxBlur","fxStreak","fxBars","qEnhance","qSharp","textStyle","hookText","watermark"].forEach(id =>
   $(id).addEventListener("change", () => { if (S.songBuf && !S.playing) drawFrame(previewT()); }));
+$("fmtSize").addEventListener("change", () => {
+  const v = $("fmtSize").value;
+  if (v === "45") { W = 864; H = 1080; }
+  else if (v === "11") { W = 900; H = 900; }
+  else if (v === "169") { W = 1280; H = 720; }
+  else { W = 720; H = 1280; }
+  canvas.width = W; canvas.height = H; S._lf = null;
+  canvas.style.aspectRatio = W + " / " + H;
+  canvas.style.maxWidth = W > H ? "560px" : (W === H ? "400px" : "330px");
+  if (S.songBuf) drawFrame(previewT());
+  setStatus("Video size set: " + W + " × " + H + ".");
+});
 $("tbExport").addEventListener("click", e => { e.preventDefault(); $("btnExport").click(); });
 $("tbImport").addEventListener("click", e => { e.preventDefault(); document.querySelector(".cardMedia").scrollIntoView({ behavior: "smooth", block: "start" }); });
 ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
