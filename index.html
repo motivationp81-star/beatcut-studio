@@ -529,7 +529,7 @@ function drawFrame(rawT) {
       let panX = 0; const trv = M.tr !== "none" ? M.tr : (seg.mTr != null ? seg.mTr : (seg.tr || "none"));
       if (trv === "slide") panX = Math.max(0, 1 - segP * 3) * 90 * (seg.dir || 1);
       if (trv === "fade") ctx.globalAlpha = Math.min(1, 0.2 + segP * 3.2);
-      drawCover(v, v.videoWidth, v.videoHeight, punch * (1 + (seg.kb > 0 ? segP : 1 - segP) * 0.15), panX);
+      drawCover(v, v.videoWidth, v.videoHeight, punch * (1 + (seg.kb > 0 ? segP : 1 - segP) * 0.24), panX + (seg.dir || 1) * segP * 34);
       ctx.globalAlpha = 1;
       try { const lc = S._lf || (S._lf = document.createElement("canvas")); if (lc.width !== canvas.width) { lc.width = canvas.width; lc.height = canvas.height; } lc.getContext("2d").drawImage(canvas, 0, 0); } catch(_){}
     } else if (S._lf) {
