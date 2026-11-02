@@ -11,7 +11,7 @@
   header { text-align: center; padding: 8px 0 12px; }
   h1 { font-size: 24px; margin: 0; } h1 .b { color: #ff4d5e; }
   .tag { color: #98a2ba; font-size: 13.5px; margin: 5px 0 0; }
-  .stageCard { background: #131826; border: 1px solid #232b42; border-radius: 16px; padding: 12px; position: sticky; top: 8px; z-index: 5; }
+  .stageCard { background: #131826; border: 1px solid #232b42; border-radius: 16px; padding: 12px; position: sticky; top: 54px; z-index: 5; }
   canvas#stage { width: 100%; max-width: 330px; aspect-ratio: 9/16; display: block; margin: 0 auto; background: #000; border-radius: 12px; }
   .transport { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
   #btnPlay { flex: 0 0 auto; width: 52px; height: 52px; border-radius: 50%; border: none; background: #ff4d5e; color: #fff; font-size: 21px; cursor: pointer; }
@@ -33,7 +33,14 @@
   input[type=range] { width: 100%; accent-color: #ff4d5e; }
   .rangeRow { display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: #9aa3b8; }
   .rangeRow output { min-width: 40px; text-align: right; color: #d5dbee; font-variant-numeric: tabular-nums; }
-  #timeline { width: 100%; height: 46px; background: #0e1220; border: 1px solid #232b42; border-radius: 10px; display: block; }
+  #timeline { width: 100%; height: 96px; background: #101116; border: 1px solid #232b42; border-radius: 10px; display: block; }
+  .topbar { display: flex; align-items: center; gap: 22px; background: #17181c; border-bottom: 1px solid #2a2b31; padding: 9px 16px; position: sticky; top: 0; z-index: 30; font-size: 14px; }
+  .tbLogo { font-weight: 700; color: #eef1f8; } .tbLogo b { color: #ff4d5e; }
+  .tbMenu { display: flex; gap: 18px; color: #9aa0ae; }
+  .tbMenu a { color: #9aa0ae; text-decoration: none; }
+  .tbMenu .tbOn { color: #fff; border-bottom: 2px solid #ff4d5e; padding-bottom: 2px; }
+  .tbRight { margin-left: auto; color: #71768a; font-size: 12.5px; }
+  @media (max-width: 700px) { .tbRight { display: none; } }
   .hint { font-size: 12.5px; color: #78829c; margin-top: 6px; }
   #btnAuto { width: 100%; padding: 14px; border: none; border-radius: 12px; background: #31406e; color: #fff; font-size: 16px; font-weight: 800; cursor: pointer; margin-top: 14px; }
   #btnAuto:disabled { opacity: .45; }
@@ -64,10 +71,21 @@
     #timeline { height: 96px; }
     .wrap > p.hint { grid-column: 1 / -1; grid-row: 6; }
     footer { grid-column: 1 / -1; }
+    /* pro panel look — FilmCraft/Premiere andaaz */
+    .wrap > header { display: none; }
+    .card, .stageCard { background: #17181c; border: 1px solid #2a2b31; border-radius: 8px; }
+    .card h2 { font-size: 11.5px; letter-spacing: 1.4px; text-transform: uppercase; color: #9aa0ae; border-bottom: 1px solid #26272e; padding-bottom: 9px; margin-bottom: 12px; }
+    #timeline { height: auto; border-radius: 6px; }
+    .topbar { font-size: 14.5px; }
   }
 </style>
 </head>
 <body>
+<div class="topbar">
+  <span class="tbLogo">🎬 BeatCut <b>Studio</b></span>
+  <span class="tbMenu"><a href="#" id="tbImport">Import</a><span class="tbOn">Edit</span><a href="#" id="tbExport">Export</a></span>
+  <span class="tbRight">Har gaana · Har video · Beat par edit</span>
+</div>
 <div class="wrap">
   <header>
     <h1>🎬 BeatCut <span class="b">Studio</span></h1>
@@ -100,7 +118,7 @@
 
   <div class="card cardTl">
     <h2>2 · Timeline &amp; trim</h2>
-    <canvas id="timeline" width="720" height="46"></canvas>
+    <canvas id="timeline" width="1440" height="220"></canvas>
     <p class="hint">Upar wali patti = tumhara edit. Chhoti lakeerein = beat, bade hisse = cuts.</p>
     <div class="rangeRow"><span>Shuru</span><input type="range" id="trimStart" min="0" max="100" value="0" step="0.1"><output id="trimStartVal">0.0s</output></div>
     <div class="rangeRow"><span>Aakhir</span><input type="range" id="trimEnd" min="0" max="100" value="100" step="0.1"><output id="trimEndVal">0.0s</output></div>
@@ -292,6 +310,11 @@ function analyseBeats() {
   const buf = S.songBuf, sr = buf.sampleRate, ch = buf.numberOfChannels;
   const data = new Float32Array(buf.length);
   for (let c = 0; c < ch; c++) { const d = buf.getChannelData(c); for (let i = 0; i < d.length; i++) data[i] += d[i] / ch; }
+  const NB = 600; S.wave = new Array(NB).fill(0);
+  const per = Math.max(1, Math.floor(data.length / NB));
+  for (let b = 0; b < NB; b++) { let mx = 0; const st = b * per; for (let i = st; i < Math.min(data.length, st + per); i += 16) { const v = Math.abs(data[i]); if (v > mx) mx = v; } S.wave[b] = mx; }
+  let wmax = 0; S.wave.forEach(v => { if (v > wmax) wmax = v; });
+  if (wmax) S.wave = S.wave.map(v => v / wmax);
   const lp = new Float32Array(data.length); let prev = 0; const a = 0.12;
   for (let i = 0; i < data.length; i++) { prev = prev + a * (data[i] - prev); lp[i] = prev; }
   const hop = 512, win = 2048, n = Math.floor((lp.length - win) / hop);
@@ -368,22 +391,67 @@ function tlSignature() { return $("lyrics").value + "|" + $("hookText").value + 
 function ensureTimeline() { const sig = tlSignature(); if (sig !== S.tlSig) { S.tlSig = sig; buildTimeline(); } }
 $("lyrics").addEventListener("input", () => { if (S.songBuf) ensureTimeline(); });
 $("hookText").addEventListener("input", () => { if (S.songBuf) ensureTimeline(); });
+function segLabel(sg) {
+  if (S.clips.length) return "Clip " + (((sg.clipIdx != null ? sg.clipIdx : sg.idx) % S.clips.length) + 1);
+  if (S.photos.length) return "Photo " + (((sg.clipIdx != null ? sg.clipIdx : sg.idx) % S.photos.length) + 1);
+  return "Beat FX";
+}
 function drawTimelineStrip() {
   const c = $("timeline"), g = c.getContext("2d");
-  const tw = c.width, th = c.height, span = Math.max(0.01, S.t1 - S.t0);
-  g.fillStyle = "#0e1220"; g.fillRect(0, 0, tw, th);
-  if (!S.segments.length) return;
+  const desk = window.innerWidth >= 1024;
+  const wantW = desk ? 1440 : 720, wantH = desk ? 220 : 110;
+  if (c.width !== wantW || c.height !== wantH) { c.width = wantW; c.height = wantH; }
+  const tw = c.width, th = c.height, s = tw / 1440, span = Math.max(0.01, S.t1 - S.t0);
+  const GUT = 46 * s, RW = tw - GUT;
+  const xOf = t => GUT + (t - S.t0) / span * RW;
+  g.fillStyle = "#101116"; g.fillRect(0, 0, tw, th);
+  // ruler with timecodes
+  g.fillStyle = "#17181d"; g.fillRect(0, 0, tw, 30 * s);
+  g.fillStyle = "#8a8f9e"; g.font = Math.round(19 * s) + "px system-ui"; g.textAlign = "left"; g.textBaseline = "middle";
+  const stepS = span > 90 ? 10 : span > 40 ? 5 : span > 18 ? 2 : 1;
+  for (let sec = Math.ceil(S.t0); sec <= S.t1; sec += stepS) {
+    const x = xOf(sec);
+    g.fillRect(x, 17 * s, 2 * s, 13 * s);
+    g.fillText(Math.floor(sec / 60) + ":" + String(sec % 60).padStart(2, "0"), x + 5 * s, 11 * s);
+  }
+  g.fillStyle = "rgba(255,255,255,0.35)";
+  S.beats.forEach(b => { if (b.t < S.t0 || b.t > S.t1) return; g.fillRect(xOf(b.t), 23 * s, 1.5 * s, 7 * s); });
+  // track headers
+  g.fillStyle = "#23242b"; g.fillRect(0, 34 * s, GUT - 4 * s, 80 * s); g.fillRect(0, 120 * s, GUT - 4 * s, 80 * s);
+  g.fillStyle = "#cfd4e4"; g.font = "700 " + Math.round(21 * s) + "px system-ui"; g.textAlign = "center";
+  g.fillText("V1", (GUT - 4 * s) / 2, 74 * s); g.fillText("A1", (GUT - 4 * s) / 2, 160 * s);
+  g.textAlign = "left";
+  // V1 — segment blocks
   S.segments.forEach((sg, i) => {
-    const x = (sg.start - S.t0) / span * tw, wdt = Math.max(2, (sg.end - sg.start) / span * tw - 2);
-    g.fillStyle = i % 2 ? "#2c3a63" : "#3b4f8a";
-    g.fillRect(x, 8, wdt, th - 16);
+    const x = xOf(sg.start), wdt = Math.max(2, (sg.end - sg.start) / span * RW - 2 * s);
+    g.fillStyle = i % 2 ? "#274b73" : "#2f5d8f";
+    g.fillRect(x, 36 * s, wdt, 78 * s);
+    if (wdt > 58 * s) {
+      g.fillStyle = "rgba(255,255,255,0.92)"; g.font = Math.round(18 * s) + "px system-ui";
+      g.fillText(segLabel(sg), x + 7 * s, 62 * s, wdt - 12 * s);
+      g.fillStyle = "rgba(255,255,255,0.55)"; g.font = Math.round(15 * s) + "px system-ui";
+      g.fillText((sg.end - sg.start).toFixed(1) + "s", x + 7 * s, 88 * s, wdt - 12 * s);
+    }
   });
-  if (S.selSeg >= 0 && S.segments[S.selSeg]) { const sg = S.segments[S.selSeg]; const sx2 = (sg.start - S.t0) / span * tw, sw2 = Math.max(3, (sg.end - sg.start) / span * tw - 2); g.strokeStyle = "#ffd23e"; g.lineWidth = 3; g.strokeRect(sx2 + 1, 6, sw2 - 2, th - 12); }
-  g.fillStyle = "rgba(255,255,255,0.55)";
-  S.beats.forEach(b => { if (b.t < S.t0 || b.t > S.t1) return; const x = (b.t - S.t0) / span * tw; g.fillRect(x, th - 7, 1.4, 5); });
+  if (S.selSeg >= 0 && S.segments[S.selSeg]) { const sg = S.segments[S.selSeg]; const x = xOf(sg.start), wdt = Math.max(3, (sg.end - sg.start) / span * RW - 2 * s); g.strokeStyle = "#ffd23e"; g.lineWidth = 3.5 * s; g.strokeRect(x + 1, 35 * s, wdt - 2, 80 * s); }
+  // A1 — song waveform
+  g.fillStyle = "#14151a"; g.fillRect(GUT, 120 * s, RW, 80 * s);
+  if (S.wave && S.duration) {
+    g.fillStyle = "#3fae6a";
+    const midY = 160 * s, maxH = 36 * s, colW = Math.max(2, Math.round(3 * s));
+    const cols = Math.floor(RW / colW);
+    for (let i = 0; i < cols; i++) {
+      const tt = S.t0 + (i / cols) * span;
+      const bi = Math.min(S.wave.length - 1, Math.floor(tt / S.duration * S.wave.length));
+      const h = Math.max(1.2 * s, S.wave[bi] * maxH);
+      g.fillRect(GUT + i * colW, midY - h, colW - 1, h * 2);
+    }
+    g.fillStyle = "rgba(255,255,255,0.5)"; g.font = Math.round(15 * s) + "px system-ui";
+    g.fillText("Gaana — beat par kata hua", GUT + 8 * s, 132 * s);
+  }
   // playhead
-  const px = (previewT() - S.t0) / span * tw;
-  g.fillStyle = "#ff4d5e"; g.fillRect(px - 1, 0, 2.4, th);
+  const px = xOf(Math.min(Math.max(previewT(), S.t0), S.t1));
+  g.fillStyle = "#ff4d5e"; g.fillRect(px - 1.5 * s, 0, 3 * s, th);
 }
 function previewT() { return songEl.currentTime || S.t0; }
 function refreshReady() {
@@ -744,8 +812,10 @@ function syncSegUI() {
 }
 $("timeline").addEventListener("click", e => {
   if (!S.segments.length) return;
-  const r = $("timeline").getBoundingClientRect();
-  const t = S.t0 + ((e.clientX - r.left) / Math.max(1, r.width)) * (S.t1 - S.t0);
+  const c = $("timeline"), r = c.getBoundingClientRect();
+  const cx = (e.clientX - r.left) * (c.width / Math.max(1, r.width));
+  const GUT = 46 * (c.width / 1440), RW = c.width - GUT;
+  const t = S.t0 + ((cx - GUT) / RW) * (S.t1 - S.t0);
   const i = S.segments.findIndex(sg => t >= sg.start && t < sg.end);
   if (i < 0) return;
   S.selSeg = i; syncSegUI(); drawTimelineStrip();
@@ -790,6 +860,8 @@ $("lyrics").addEventListener("change", () => { if (S.songBuf) buildTimeline(); }
 $("mTrans").addEventListener("change", () => { if (S.songBuf && !S.playing) drawFrame(previewT()); });
 ["fxGlitch","fxShake","fxFlash","fxZoom","fxStickers","fxVignette","qEnhance","qSharp","textStyle","hookText","watermark"].forEach(id =>
   $(id).addEventListener("change", () => { if (S.songBuf && !S.playing) drawFrame(previewT()); }));
+$("tbExport").addEventListener("click", e => { e.preventDefault(); $("btnExport").click(); });
+$("tbImport").addEventListener("click", e => { e.preventDefault(); document.querySelector(".cardMedia").scrollIntoView({ behavior: "smooth", block: "start" }); });
 ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
 ctx.fillStyle = "#3d4666"; ctx.font = "700 44px system-ui"; ctx.textAlign = "center";
 ctx.fillText("🎬 BeatCut Studio", W / 2, H / 2 - 20);
