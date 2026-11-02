@@ -78,6 +78,7 @@
     <div><button class="ghost" id="render" style="width:100%" disabled>RENDER + DOWNLOAD MP4</button></div>
   </div>
   <div id="parts"></div>
+  <video id="outPlayer" controls playsinline style="display:none;width:100%;max-width:360px;border-radius:10px;margin-top:12px"></video>
   <div id="status">Add clips (or photos) and a song, then press BUILD MY EDIT.</div>
 </div>
 
@@ -463,14 +464,19 @@ el("render").addEventListener("click", async () => {
     statusEl.textContent = "Finishing the MP4…";
     await output.finalize();
     const blob = new Blob([target.buffer], { type: "video/mp4" });
+    const url = URL.createObjectURL(blob);
+    const player = el("outPlayer");
+    player.src = url;
+    player.style.display = "block";
     const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
+    a.href = url;
     a.download = "beatcut-edit.mp4";
     a.textContent = "⬇ Download your edit (MP4, " + (blob.size / 1048576).toFixed(2) + " MB)";
     a.style.cssText = "display:inline-block;margin-top:10px;background:#ffd23e;color:#111;font-weight:800;padding:11px 18px;border-radius:9px;text-decoration:none";
-    statusEl.textContent = "✅ RENDER COMPLETE — " + totalFrames + " frames · " + W + "×" + H + " · " + DUR.toFixed(1) + "s. Your edit is ready:";
+    statusEl.textContent = "✅ RENDER COMPLETE — " + totalFrames + " frames · " + W + "×" + H + " · " + DUR.toFixed(1) + "s. Watch it right here (no download needed), or download it:";
     statusEl.appendChild(document.createElement("br"));
     statusEl.appendChild(a);
+    try { player.scrollIntoView({ block: "center" }); } catch (_) {}
   } catch (err) {
     say("Render failed: " + (err && err.message ? err.message : err));
     console.error(err);
