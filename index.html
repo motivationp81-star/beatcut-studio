@@ -119,7 +119,7 @@
   <div class="card cardTl">
     <h2>2 · Timeline &amp; trim</h2>
     <canvas id="timeline" width="1440" height="220"></canvas>
-    <p class="hint">This is your edit: blue blocks on V1 are your cuts, the green track below is your song. Tap a block to select it.</p>
+    <p class="hint">This is your edit: blue blocks on V1 are your cuts, the green track below is your song. Click a block to select it. DRAG a block left/right to move it. Drag a block's edge to trim it. Click the ruler on top to jump there.</p>
     <div class="rangeRow"><span>Start</span><input type="range" id="trimStart" min="0" max="100" value="0" step="0.1"><output id="trimStartVal">0.0s</output></div>
     <div class="rangeRow"><span>End</span><input type="range" id="trimEnd" min="0" max="100" value="100" step="0.1"><output id="trimEndVal">0.0s</output></div>
     <label class="f">Cut speed</label>
@@ -132,6 +132,7 @@
     </select>
     <label class="f">✂ Segment edit — tap a part on the timeline to select it, then change it</label>
     <div id="segInfo" class="hint">No part selected yet. Tap the timeline above.</div>
+    <label>Timeline zoom <input type="range" id="tlZoom" min="1" max="4" step="0.5" value="1" style="width:150px;vertical-align:middle"></label>
     <label class="f">Clip/photo in the selected part</label>
     <select id="segClip"><option value="-1">Auto (round-robin)</option></select>
     <label class="f">Speed of the selected part</label>
@@ -148,6 +149,7 @@
     </select>
     <div class="chips" style="margin-top:12px">
       <button class="chip" id="btnSegSplit" type="button">✂ Split in the middle</button>
+      <button class="chip" id="btnSegSplitPlay" type="button">✂ Split at playhead</button>
       <button class="chip" id="btnSegDel" type="button">🗑 Delete this part</button>
     </div>
     <p class="hint">Note: AUTO EDIT or changing the trim rebuilds the parts — manual changes will reset.</p>
@@ -352,7 +354,14 @@ function buildTimeline() {
     inRange.filter(b => b.s > 0.62).forEach(b => cutTimes.push(b.t));
   } else {
     const step = rate === "auto" ? P.beatsPerCut : parseInt(rate, 10);
-    for (let i = 0; i < inRange.length; i += step) cutTimes.push(inRange[i].t);
+    let since = 0, lastCut = S.t0;
+    inRange.forEach(b => {
+      since++;
+      const strong = b.s > 0.75, weak = b.s < 0.22;
+      if ((since >= step && !weak) || (strong && since >= 1 && b.t - lastCut > 0.3) || (since >= step * 2)) {
+        if (b.t - lastCut > 0.25) { cutTimes.push(b.t); lastCut = b.t; since = 0; }
+      }
+    });
   }
   cutTimes.push(S.t1);
   cutTimes = [...new Set(cutTimes.map(x => Math.round(x * 100) / 100))].sort((a, b) => a - b);
@@ -362,14 +371,27 @@ function buildTimeline() {
     S.segments.push({ start: cutTimes[i], end: cutTimes[i + 1], idx: S.segments.length });
   }
   S.selSeg = -1;
-  const R = rng32(S.seed || 1234);
   const funky = effPreset() === "funk";
+  S.segments.forEach((sg, i) => {
+    let str = 0.5;
+    for (const b of S.beats) { if (Math.abs(b.t - sg.start) < 0.08) { str = b.s; break; } }
+    sg.zAmt = 0.7 + str * 0.9;
+    sg.rate = (funky && str > 0.8) ? 1.25 : (funky && str < 0.25 ? 0.9 : 1);
+    sg.dir = i % 2 ? -1 : 1;
+    sg.kb = i % 2 ? -1 : 1;
+    sg.tr = i === 0 ? "fade" : "none";
+  });
+  const cursors = {};
   S.segments.forEach(sg => {
-    sg.zAmt = 0.6 + R() * 1.1;
-    sg.rate = funky ? [1.3, 1.3, 0.8, 1.5, 1.0][Math.floor(R() * 5)] : [1, 1, 1, 0.85, 1.15][Math.floor(R() * 5)];
-    sg.dir = R() < 0.5 ? -1 : 1;
-    sg.kb = R() < 0.5 ? -1 : 1;
-    sg.tr = R() < 0.18 ? (R() < 0.5 ? "fade" : "slide") : "none";
+    if (!S.clips.length) return;
+    const ci = (sg.clipIdx != null ? sg.clipIdx : sg.idx) % S.clips.length;
+    const dur = S.clips[ci].el.duration || 0;
+    if (dur > 1) {
+      let cur = cursors[ci] || 0;
+      if (cur > dur - 0.6) cur = 0;
+      sg.srcStart = Math.round(cur * 100) / 100;
+      cursors[ci] = cur + (sg.end - sg.start);
+    }
   });
   const lines = $("lyrics").value.split("\n").map(x => x.trim()).filter(Boolean);
   S.wordTimes = []; S.lineTimes = [];
@@ -396,34 +418,45 @@ function segLabel(sg) {
   if (S.photos.length) return "Photo " + (((sg.clipIdx != null ? sg.clipIdx : sg.idx) % S.photos.length) + 1);
   return "Beat FX";
 }
+function tlGeom() {
+  const c = $("timeline");
+  const sc = c.width / 1440;
+  const GUT = 46 * sc, RW = c.width - GUT;
+  const span = Math.max(0.01, S.t1 - S.t0);
+  const z = S.tlZoom || 1;
+  const vSpan = span / z;
+  let v0 = (S.viewT0 != null && z > 1) ? S.viewT0 : S.t0;
+  v0 = Math.min(Math.max(v0, S.t0), S.t1 - vSpan);
+  if (z <= 1) v0 = S.t0;
+  return { c, s: sc, GUT, RW, v0, v1: v0 + vSpan, vSpan };
+}
 function drawTimelineStrip() {
   const c = $("timeline"), g = c.getContext("2d");
   const desk = window.innerWidth >= 1024;
   const wantW = desk ? 1440 : 720, wantH = desk ? 220 : 110;
   if (c.width !== wantW || c.height !== wantH) { c.width = wantW; c.height = wantH; }
-  const tw = c.width, th = c.height, s = tw / 1440, span = Math.max(0.01, S.t1 - S.t0);
-  const GUT = 46 * s, RW = tw - GUT;
-  const xOf = t => GUT + (t - S.t0) / span * RW;
+  const gm = tlGeom(), tw = c.width, th = c.height, s = gm.s;
+  const GUT = gm.GUT, RW = gm.RW;
+  const xOf = t => GUT + (t - gm.v0) / gm.vSpan * RW;
   g.fillStyle = "#101116"; g.fillRect(0, 0, tw, th);
-  // ruler with timecodes
   g.fillStyle = "#17181d"; g.fillRect(0, 0, tw, 30 * s);
   g.fillStyle = "#8a8f9e"; g.font = Math.round(19 * s) + "px system-ui"; g.textAlign = "left"; g.textBaseline = "middle";
-  const stepS = span > 90 ? 10 : span > 40 ? 5 : span > 18 ? 2 : 1;
-  for (let sec = Math.ceil(S.t0); sec <= S.t1; sec += stepS) {
+  const stepS = gm.vSpan > 90 ? 10 : gm.vSpan > 40 ? 5 : gm.vSpan > 18 ? 2 : gm.vSpan > 8 ? 1 : 0.5;
+  for (let sec = Math.ceil(gm.v0 * 2) / 2; sec <= gm.v1; sec += stepS) {
     const x = xOf(sec);
     g.fillRect(x, 17 * s, 2 * s, 13 * s);
-    g.fillText(Math.floor(sec / 60) + ":" + String(sec % 60).padStart(2, "0"), x + 5 * s, 11 * s);
+    g.fillText(Math.floor(sec / 60) + ":" + String(Math.floor(sec % 60)).padStart(2, "0"), x + 5 * s, 11 * s);
   }
   g.fillStyle = "rgba(255,255,255,0.35)";
-  S.beats.forEach(b => { if (b.t < S.t0 || b.t > S.t1) return; g.fillRect(xOf(b.t), 23 * s, 1.5 * s, 7 * s); });
-  // track headers
+  S.beats.forEach(b => { if (b.t < gm.v0 || b.t > gm.v1) return; g.fillRect(xOf(b.t), 23 * s, 1.5 * s, 7 * s); });
   g.fillStyle = "#23242b"; g.fillRect(0, 34 * s, GUT - 4 * s, 80 * s); g.fillRect(0, 120 * s, GUT - 4 * s, 80 * s);
   g.fillStyle = "#cfd4e4"; g.font = "700 " + Math.round(21 * s) + "px system-ui"; g.textAlign = "center";
   g.fillText("V1", (GUT - 4 * s) / 2, 74 * s); g.fillText("A1", (GUT - 4 * s) / 2, 160 * s);
   g.textAlign = "left";
-  // V1 — segment blocks
   S.segments.forEach((sg, i) => {
-    const x = xOf(sg.start), wdt = Math.max(2, (sg.end - sg.start) / span * RW - 2 * s);
+    if (sg.end < gm.v0 || sg.start > gm.v1) return;
+    const x = xOf(Math.max(sg.start, gm.v0)), x2 = xOf(Math.min(sg.end, gm.v1));
+    const wdt = Math.max(2, x2 - x - 2 * s);
     g.fillStyle = i % 2 ? "#274b73" : "#2f5d8f";
     g.fillRect(x, 36 * s, wdt, 78 * s);
     if (wdt > 58 * s) {
@@ -433,15 +466,15 @@ function drawTimelineStrip() {
       g.fillText((sg.end - sg.start).toFixed(1) + "s", x + 7 * s, 88 * s, wdt - 12 * s);
     }
   });
-  if (S.selSeg >= 0 && S.segments[S.selSeg]) { const sg = S.segments[S.selSeg]; const x = xOf(sg.start), wdt = Math.max(3, (sg.end - sg.start) / span * RW - 2 * s); g.strokeStyle = "#ffd23e"; g.lineWidth = 3.5 * s; g.strokeRect(x + 1, 35 * s, wdt - 2, 80 * s); }
-  // A1 — song waveform
+  if (S.drag && S.drag.mode === "move" && S.drag.target != null && S.segments[S.drag.target]) { const sg = S.segments[S.drag.target]; const x = xOf(sg.start), wdt = Math.max(3, (sg.end - sg.start) / gm.vSpan * RW - 2 * s); g.strokeStyle = "#ffffff"; g.lineWidth = 3 * s; g.strokeRect(x + 1, 35 * s, wdt - 2, 80 * s); }
+  if (S.selSeg >= 0 && S.segments[S.selSeg]) { const sg = S.segments[S.selSeg]; const x = xOf(sg.start), wdt = Math.max(3, (sg.end - sg.start) / gm.vSpan * RW - 2 * s); g.strokeStyle = "#ffd23e"; g.lineWidth = 3.5 * s; g.strokeRect(x + 1, 35 * s, wdt - 2, 80 * s); }
   g.fillStyle = "#14151a"; g.fillRect(GUT, 120 * s, RW, 80 * s);
   if (S.wave && S.duration) {
     g.fillStyle = "#3fae6a";
     const midY = 160 * s, maxH = 36 * s, colW = Math.max(2, Math.round(3 * s));
     const cols = Math.floor(RW / colW);
     for (let i = 0; i < cols; i++) {
-      const tt = S.t0 + (i / cols) * span;
+      const tt = gm.v0 + (i / cols) * gm.vSpan;
       const bi = Math.min(S.wave.length - 1, Math.floor(tt / S.duration * S.wave.length));
       const h = Math.max(1.2 * s, S.wave[bi] * maxH);
       g.fillRect(GUT + i * colW, midY - h, colW - 1, h * 2);
@@ -449,9 +482,8 @@ function drawTimelineStrip() {
     g.fillStyle = "rgba(255,255,255,0.5)"; g.font = Math.round(15 * s) + "px system-ui";
     g.fillText("Song — cut on the beat", GUT + 8 * s, 132 * s);
   }
-  // playhead
-  const px = xOf(Math.min(Math.max(previewT(), S.t0), S.t1));
-  g.fillStyle = "#ff4d5e"; g.fillRect(px - 1.5 * s, 0, 3 * s, th);
+  const pt = previewT();
+  if (pt >= gm.v0 && pt <= gm.v1) { const px = xOf(pt); g.fillStyle = "#ff4d5e"; g.fillRect(px - 1.5 * s, 0, 3 * s, th); }
 }
 function previewT() { return songEl.currentTime || S.t0; }
 function refreshReady() {
@@ -522,7 +554,7 @@ function drawFrame(rawT) {
       if (S.lastSegIdx !== seg.idx) {
         S.lastSegIdx = seg.idx;
         const dur = v.duration || 1;
-        try { v.currentTime = (seg.idx * 3.7) % Math.max(1, dur - 0.5); } catch(_){}
+        try { v.currentTime = seg.srcStart != null ? seg.srcStart : (seg.idx * 3.7) % Math.max(1, dur - 0.5); } catch(_){}
         v.playbackRate = (seg.mRate != null ? seg.mRate : (seg.rate || 1)) * (M.spd || 1);
       }
       if ((S.playing || S.exporting) && v.paused) v.play().catch(() => {});
@@ -810,16 +842,63 @@ function syncSegUI() {
   $("segTrans").value = sg.mTr != null ? sg.mTr : "";
   $("segZoom").value = sg.mZoom != null ? String(sg.mZoom) : "";
 }
-$("timeline").addEventListener("click", e => {
+function seekTo(t) {
+  t = Math.min(Math.max(t, S.t0), S.t1 - 0.05);
+  try { songEl.currentTime = t; } catch (_) {}
+  if (!S.playing) drawFrame(t + 0.02);
+  drawTimelineStrip();
+}
+const tlC = $("timeline");
+let tlDrag = null;
+function tlPos(e) { const r = tlC.getBoundingClientRect(); return { x: (e.clientX - r.left) * (tlC.width / Math.max(1, r.width)), y: (e.clientY - r.top) * (tlC.height / Math.max(1, r.height)) }; }
+tlC.addEventListener("pointerdown", e => {
   if (!S.segments.length) return;
-  const c = $("timeline"), r = c.getBoundingClientRect();
-  const cx = (e.clientX - r.left) * (c.width / Math.max(1, r.width));
-  const GUT = 46 * (c.width / 1440), RW = c.width - GUT;
-  const t = S.t0 + ((cx - GUT) / RW) * (S.t1 - S.t0);
+  const gm = tlGeom(), p = tlPos(e), t = gm.v0 + ((p.x - gm.GUT) / gm.RW) * gm.vSpan;
+  try { tlC.setPointerCapture(e.pointerId); } catch (_) {}
+  if (p.y < 32 * gm.s) { tlDrag = { mode: "seek" }; S.drag = tlDrag; seekTo(t); return; }
   const i = S.segments.findIndex(sg => t >= sg.start && t < sg.end);
   if (i < 0) return;
-  S.selSeg = i; syncSegUI(); drawTimelineStrip();
-  if (!S.playing && S.songBuf) { try { songEl.currentTime = S.segments[i].start + 0.02; } catch (_) {} drawFrame(S.segments[i].start + 0.05); }
+  S.selSeg = i; syncSegUI();
+  const sg = S.segments[i], edge = 11 * gm.s;
+  const xL = gm.GUT + (sg.start - gm.v0) / gm.vSpan * gm.RW, xR = gm.GUT + (sg.end - gm.v0) / gm.vSpan * gm.RW;
+  if (i > 0 && Math.abs(p.x - xL) <= edge) tlDrag = { mode: "trimL", i };
+  else if (i < S.segments.length - 1 && Math.abs(p.x - xR) <= edge) tlDrag = { mode: "trimR", i };
+  else tlDrag = { mode: "move", i, target: i };
+  S.drag = tlDrag; drawTimelineStrip();
+});
+tlC.addEventListener("pointermove", e => {
+  const gm = tlGeom(), p = tlPos(e), t = gm.v0 + ((p.x - gm.GUT) / gm.RW) * gm.vSpan;
+  if (!tlDrag) {
+    const i = S.segments.findIndex(sg => t >= sg.start && t < sg.end);
+    if (i >= 0 && p.y >= 32 * gm.s) { const sg = S.segments[i], edge = 11 * gm.s; const xL = gm.GUT + (sg.start - gm.v0) / gm.vSpan * gm.RW, xR = gm.GUT + (sg.end - gm.v0) / gm.vSpan * gm.RW; tlC.style.cursor = (Math.abs(p.x - xL) <= edge || Math.abs(p.x - xR) <= edge) ? "ew-resize" : "grab"; }
+    return;
+  }
+  if (tlDrag.mode === "seek") { seekTo(t); return; }
+  if (tlDrag.mode === "trimL") { const sg = S.segments[tlDrag.i], pv = S.segments[tlDrag.i - 1]; if (pv) { const nt = Math.round(Math.min(Math.max(t, pv.start + 0.15), sg.end - 0.15) * 100) / 100; pv.end = nt; sg.start = nt; } }
+  else if (tlDrag.mode === "trimR") { const sg = S.segments[tlDrag.i], nx = S.segments[tlDrag.i + 1]; if (nx) { const nt = Math.round(Math.max(Math.min(t, nx.end - 0.15), sg.start + 0.15) * 100) / 100; sg.end = nt; nx.start = nt; } }
+  else if (tlDrag.mode === "move") { const j = S.segments.findIndex(sg => t >= sg.start && t < sg.end); if (j >= 0) tlDrag.target = j; }
+  S.drag = tlDrag; drawTimelineStrip();
+});
+tlC.addEventListener("pointerup", () => {
+  if (!tlDrag) return;
+  const d = tlDrag; tlDrag = null; S.drag = null;
+  if (d.mode === "move" && d.target != null && d.target !== d.i) {
+    const A = S.segments[d.i], B = S.segments[d.target];
+    ["clipIdx", "zAmt", "rate", "dir", "kb", "tr", "mRate", "mTr", "mZoom", "srcStart"].forEach(k => { const tmp = A[k]; A[k] = B[k]; B[k] = tmp; });
+    S.selSeg = d.target; S.lastSegIdx = -1;
+    setStatus("Move done — two parts swapped places on the timeline.");
+  } else if (d.mode === "trimL" || d.mode === "trimR") {
+    S.lastSegIdx = -1; setStatus("Trim done — part length changed. Neighbour adjusted with it.");
+  } else if (d.mode === "move" && !S.playing && S.songBuf) {
+    seekTo(S.segments[d.i].start + 0.02);
+  }
+  syncSegUI(); drawTimelineStrip();
+});
+$("tlZoom").addEventListener("input", () => {
+  S.tlZoom = parseFloat($("tlZoom").value) || 1;
+  const span = Math.max(0.01, S.t1 - S.t0), vSpan = span / S.tlZoom;
+  S.viewT0 = Math.min(Math.max(previewT() - vSpan / 2, S.t0), S.t1 - vSpan);
+  drawTimelineStrip();
 });
 $("segClip").addEventListener("change", () => { const sg = selSegObj(); if (!sg) return; const v = parseInt($("segClip").value, 10); sg.clipIdx = v >= 0 ? v : undefined; syncSegUI(); if (!S.playing) drawFrame(previewT()); });
 $("segSpeed").addEventListener("change", () => { const sg = selSegObj(); if (!sg) return; const v = $("segSpeed").value; sg.mRate = v === "" ? undefined : parseFloat(v); });
@@ -829,10 +908,19 @@ $("btnSegSplit").addEventListener("click", () => {
   const sg = selSegObj(); if (!sg) { setStatus("First tap the timeline to select a part."); return; }
   if (sg.end - sg.start < 0.24) { setStatus("This part is too small to split further."); return; }
   const mid = Math.round(((sg.start + sg.end) / 2) * 100) / 100;
-  const nu = { start: mid, end: sg.end, idx: sg.idx + 1, zAmt: sg.zAmt, rate: sg.rate, dir: sg.dir, tr: sg.tr, clipIdx: sg.clipIdx, mRate: sg.mRate, mTr: sg.mTr, mZoom: sg.mZoom };
+  const nu = { start: mid, end: sg.end, idx: sg.idx + 1, zAmt: sg.zAmt, rate: sg.rate, dir: sg.dir, kb: sg.kb, tr: sg.tr, clipIdx: sg.clipIdx, mRate: sg.mRate, mTr: sg.mTr, mZoom: sg.mZoom, srcStart: sg.srcStart != null ? sg.srcStart + (mid - sg.start) : undefined };
   sg.end = mid;
   S.segments.splice(sg.idx + 1, 0, nu); reindexSegs(); S.selSeg = sg.idx + 1;
   syncSegUI(); drawTimelineStrip(); setStatus("✂ Part split in the middle — now " + S.segments.length + " parts in total.");
+});
+$("btnSegSplitPlay").addEventListener("click", () => {
+  const t = Math.round(previewT() * 100) / 100;
+  const sg = S.segments.find(x => t > x.start + 0.12 && t < x.end - 0.12);
+  if (!sg) { setStatus("The playhead is not inside a part with room to split. Click the ruler to move the playhead into the middle of a part first."); return; }
+  const nu = { start: t, end: sg.end, idx: sg.idx + 1, zAmt: sg.zAmt, rate: sg.rate, dir: sg.dir, kb: sg.kb, tr: sg.tr, clipIdx: sg.clipIdx, mRate: sg.mRate, mTr: sg.mTr, mZoom: sg.mZoom, srcStart: sg.srcStart != null ? sg.srcStart + (t - sg.start) : undefined };
+  sg.end = t;
+  S.segments.splice(sg.idx + 1, 0, nu); reindexSegs(); S.selSeg = sg.idx + 1;
+  syncSegUI(); drawTimelineStrip(); setStatus("✂ Split at the playhead — now " + S.segments.length + " parts in total.");
 });
 $("btnSegDel").addEventListener("click", () => {
   const sg = selSegObj(); if (!sg) { setStatus("First tap the timeline to select a part."); return; }
