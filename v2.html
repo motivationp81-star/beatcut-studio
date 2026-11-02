@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BeatCut Engine V2 — frame-exact render test</title>
+<style>
+  body { background:#14161c; color:#e8eaf0; font-family:system-ui,sans-serif; margin:20px; }
+  h1 { font-size:20px; } label { display:block; margin:12px 0 4px; }
+  button { background:#ffd23e; border:0; padding:12px 22px; font-weight:700; border-radius:8px; cursor:pointer; margin-top:14px; }
+  #status { background:#0c0e12; padding:12px; border-radius:8px; white-space:pre-wrap; min-height:120px; margin-top:16px; font-size:13px; }
+  a { color:#ffd23e; font-weight:700; }
+</style>
+</head>
+<body>
+<h1>BeatCut Engine V2 — frame-exact render test (WebCodecs + mediabunny)</h1>
+<p>This prototype renders OFFLINE, frame by frame — no live recording. It takes the first 6 seconds of a clip, stamps each frame with its exact time, flashes a yellow border on every whole second, mixes the song's first 6 seconds, and produces a real MP4.</p>
+<label>Video clip <input type="file" id="clipFile" accept="video/*"></label>
+<label>Song <input type="file" id="songFile" accept="audio/*"></label>
+<button id="go">RENDER 6s FRAME-EXACT</button>
+<div id="status">Waiting for files…</div>
+<p id="result"></p>
+
+<script type="module">
+import * as MB from "https://cdn.jsdelivr.net/npm/mediabunny@1.65.0/+esm";
+
+const status = (m) => { document.getElementById("status").textContent += "\n" + m; };
+document.getElementById("status").textContent = "Engine loaded: " + (MB.Input ? "mediabunny OK" : "FAILED");
+
+document.getElementById("go").addEventListener("click", async () => {
+  const clipF = document.getElementById("clipFile").files[0];
+  const songF = document.getElementById("songFile").files[0];
+  if (!clipF || !songF) { status("Pick both files first."); return; }
+  const started = performance.now();
+  try {
+    const W = 720, H = 1280, FPS = 30, DUR = 6;
+
+    status("Reading clip…");
+    const input = new MB.Input({ source: new MB.BlobSource(clipF), formats: MB.ALL_FORMATS });
+    const vTrack = await input.getPrimaryVideoTrack();
+    if (!vTrack) throw new Error("No video track found");
+    const sink = new MB.VideoSampleSink(vTrack);
+    status("Clip track OK: " + vTrack.displayWidth + "x" + vTrack.displayHeight);
+
+    status("Decoding song…");
+    const actx = new AudioContext();
+    const songBufFull = await actx.decodeAudioData(await songF.arrayBuffer());
+    const sr = songBufFull.sampleRate, len = Math.min(songBufFull.length, Math.floor(DUR * sr));
+    const songBuf = actx.createBuffer(songBufFull.numberOfChannels, len, sr);
+    for (let c = 0; c < songBufFull.numberOfChannels; c++)
+      songBuf.getChannelData(c).set(songBufFull.getChannelData(c).subarray(0, len));
+    status("Song OK: " + songBuf.duration.toFixed(1) + "s");
+
+    const canvas = new OffscreenCanvas(W, H);
+    const ctx = canvas.getContext("2d");
+    const target = new MB.BufferTarget();
+    const output = new MB.Output({ format: new MB.Mp4OutputFormat(), target });
+    const vSrc = new MB.CanvasSource(canvas, { codec: "avc", bitrate: 8_000_000 });
+    const aSrc = new MB.AudioBufferSource({ codec: "aac", bitrate: 128_000 });
+    output.addVideoTrack(vSrc);
+    output.addAudioTrack(aSrc);
+    await output.start();
+    await aSrc.add(songBuf);
+    status("Rendering frames…");
+
+    const total = DUR * FPS;
+    for (let i = 0; i < total; i++) {
+      const t = i / FPS;
+      const sample = await sink.getSample(t);
+      ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
+      if (sample) { sample.drawWithFit(ctx, { fit: "cover" }); sample.close(); }
+      const frac = t - Math.floor(t);
+      if (frac < 1 / FPS * 1.5) { ctx.strokeStyle = "#ffd23e"; ctx.lineWidth = 26; ctx.strokeRect(13, 13, W - 26, H - 26); }
+      ctx.font = "900 64px system-ui, sans-serif"; ctx.textAlign = "center";
+      ctx.lineWidth = 10; ctx.strokeStyle = "rgba(0,0,0,0.9)";
+      const label = "FRAME " + t.toFixed(2) + "s";
+      ctx.strokeText(label, W / 2, H - 90);
+      ctx.fillStyle = "#ffffff"; ctx.fillText(label, W / 2, H - 90);
+      await vSrc.add(t, 1 / FPS);
+      if (i % 60 === 0) status("  frame " + i + " / " + total);
+    }
+    await output.finalize();
+    const secs = ((performance.now() - started) / 1000).toFixed(1);
+    const blob = new Blob([target.buffer], { type: "video/mp4" });
+    const url = URL.createObjectURL(blob);
+    status("DONE in " + secs + "s — rendered " + DUR + "s of video (" + total + " frames, frame-exact). MP4 size: " + (blob.size / 1048576).toFixed(2) + " MB");
+    document.getElementById("result").innerHTML = '<a href="' + url + '" download="beatcut-v2-test.mp4">⬇ Download the V2 test MP4</a>';
+  } catch (e) {
+    status("ERROR: " + (e && e.message ? e.message : e));
+    console.error(e);
+  }
+});
+</script>
+</body>
+</html>
