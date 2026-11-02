@@ -39,6 +39,9 @@
   #btnAuto:disabled { opacity: .45; }
   #btnExport { width: 100%; padding: 16px; border: none; border-radius: 12px; background: #ff4d5e; color: #fff; font-size: 17px; font-weight: 800; cursor: pointer; margin-top: 14px; }
   #btnExport:disabled { opacity: .45; }
+  #btnExportTop { width: 100%; padding: 12px; border: none; border-radius: 12px; background: #ff4d5e; color: #fff; font-size: 15px; font-weight: 800; cursor: pointer; margin-top: 10px; }
+  #btnExportTop:disabled { opacity: .45; }
+  #dlLink { margin-top: 10px; text-align: center; background: #1d3a24; border: 1px solid #2f7a44; color: #9fe8ae; padding: 12px; border-radius: 12px; font-weight: 700; text-decoration: none; font-size: 14.5px; }
   footer { color: #5d6580; font-size: 12.5px; text-align: center; margin-top: 22px; }
   /* ── PC layout — pro editor jaisa (Premiere/FilmCraft andaaz): upar bar, baayein media bin, beech me Program preview, daayein properties/effects, neeche poori chaudi timeline ── */
   @media (min-width: 1024px) {
@@ -79,6 +82,8 @@
     </div>
     <div id="beatInfo"></div>
     <div id="status">Pehle neeche apni clip/photo aur gaana add karo 👇</div>
+    <button id="btnExportTop" disabled>⬇ VIDEO DOWNLOAD KARO</button>
+    <a id="dlLink" href="#" style="display:none">⬇ Yahi se download karo — video taiyaar hai</a>
   </div>
 
   <div class="card cardMedia">
@@ -199,7 +204,7 @@ udi udi jaaye"></textarea>
     </select>
   </div>
 
-  <button id="btnExport" disabled>⬇ VIDEO EXPORT KARO</button>
+  <button id="btnExport" disabled>⬇ VIDEO DOWNLOAD KARO</button>
   <p class="hint" style="text-align:center">Export utna hi time lega jitna lamba gaana hai (real-time render). MP4 mile to MP4, nahi to WebM download hoga.</p>
 
   <footer>BeatCut Studio v2 — tumhari files device se bahar nahi jaati.</footer>
@@ -380,7 +385,7 @@ function previewT() { return songEl.currentTime || S.t0; }
 function refreshReady() {
   S.ready = !!S.songBuf && (S.clips.length > 0 || S.photos.length > 0 || true);
   const has = !!S.songBuf;
-  $("btnPlay").disabled = !has; $("btnExport").disabled = !has; $("btnAuto").disabled = !has;
+  $("btnPlay").disabled = !has; $("btnExport").disabled = !has; $("btnExportTop").disabled = !has; $("btnAuto").disabled = !has;
   if (has) { buildTimeline(); setStatus("Taiyaar ✅ Play dabakar dekho, ya seedha Export karo."); drawFrame(previewT()); }
 }
 
@@ -645,6 +650,7 @@ function pickMime() {
   for (const c of cands) { try { if (window.MediaRecorder && MediaRecorder.isTypeSupported(c)) return c; } catch(_){} }
   return "";
 }
+$("btnExportTop").addEventListener("click", () => { $("btnExport").click(); });
 $("btnExport").addEventListener("click", async () => {
   if (!S.songBuf || S.exporting) return;
   stopPlay();
@@ -673,15 +679,19 @@ $("btnExport").addEventListener("click", async () => {
   rec.onstop = () => {
     const isMp4 = (rec.mimeType || "").includes("mp4");
     const blob = new Blob(chunks, { type: isMp4 ? "video/mp4" : "video/webm" });
+    const url = URL.createObjectURL(blob);
+    const fname = "beatcut-video." + (isMp4 ? "mp4" : "webm");
     const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob); a.download = "beatcut-video." + (isMp4 ? "mp4" : "webm"); a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
-    S.exporting = false; $("btnExport").disabled = false; $("btnPlay").disabled = false;
+    a.href = url; a.download = fname; a.click();
+    const dl = $("dlLink"); dl.href = url; dl.download = fname; dl.style.display = "block";
+    dl.textContent = "⬇ Yahi se download karo — video taiyaar hai (" + (isMp4 ? "MP4" : "WebM") + ")";
+    setTimeout(() => URL.revokeObjectURL(url), 600000);
+    S.exporting = false; $("btnExport").disabled = false; $("btnExportTop").disabled = false; $("btnPlay").disabled = false;
     canvas.width = W; canvas.height = H; buildTimeline(); drawFrame(previewT());
-    setStatus("✅ Ho gaya! Video download ho gaya (" + (isMp4 ? "MP4" : "WebM") + ") — Instagram/YouTube par daal do.");
+    setStatus("✅ Ho gaya! Video taiyaar hai — preview ke neeche wale hare DOWNLOAD button se le lo.");
   };
   buildTimeline();
-  S.exporting = true; $("btnExport").disabled = true; $("btnPlay").disabled = true;
+  S.exporting = true; $("btnExport").disabled = true; $("btnExportTop").disabled = true; $("btnPlay").disabled = true;
   try { songEl.currentTime = S.t0; } catch(_){}
   setStatus("🎬 Video ban raha hai… tab khula rakho, gaana pura chalega.");
   rec.start(250);
