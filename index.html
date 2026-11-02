@@ -84,7 +84,7 @@
 <div class="topbar">
   <span class="tbLogo">🎬 BeatCut <b>Studio</b></span>
   <span class="tbMenu"><a href="#" id="tbImport">Import</a><span class="tbOn">Edit</span><a href="#" id="tbExport">Export</a></span>
-  <span class="tbRight">Har gaana · Har video · Beat par edit</span>
+  <span class="tbRight">Any song · Any video · Edited on the beat</span>
 </div>
 <div class="wrap">
   <header>
@@ -99,112 +99,112 @@
       <span id="timeLabel">0.0s / 0.0s</span>
     </div>
     <div id="beatInfo"></div>
-    <div id="status">Pehle neeche apni clip/photo aur gaana add karo 👇</div>
+    <div id="status">Add your clip/photo and a song below to start 👇</div>
     <button id="btnExportTop" disabled>⬇ VIDEO DOWNLOAD KARO</button>
-    <a id="dlLink" href="#" style="display:none">⬇ Yahi se download karo — video taiyaar hai</a>
+    <a id="dlLink" href="#" style="display:none">⬇ Download from here — your video is ready</a>
   </div>
 
   <div class="card cardMedia">
-    <h2>1 · Media add karo</h2>
-    <label class="f">Video clips (ek ya zyada) — ya khali chhodo photo mode ke liye</label>
+    <h2>1 · Media</h2>
+    <label class="f">Video clips (one or more) — or leave empty for photo mode</label>
     <input type="file" id="fileClips" accept="video/*" multiple>
-    <label class="f">Photos (clip nahi hai to ye use honge)</label>
+    <label class="f">Photos (used when there are no clips)</label>
     <input type="file" id="filePhotos" accept="image/*" multiple>
-    <label class="f">Gaana (song) — yahi pure edit ko chalata hai 🎵</label>
+    <label class="f">Song — this drives the whole edit 🎵</label>
     <input type="file" id="fileSong" accept="audio/*">
   </div>
 
-  <button id="btnAuto" disabled>⚡ AUTO EDIT — beat par kaato</button>
+  <button id="btnAuto" disabled>⚡ AUTO EDIT — cut on the beat</button>
 
   <div class="card cardTl">
     <h2>2 · Timeline &amp; trim</h2>
     <canvas id="timeline" width="1440" height="220"></canvas>
-    <p class="hint">Upar wali patti = tumhara edit. Chhoti lakeerein = beat, bade hisse = cuts.</p>
-    <div class="rangeRow"><span>Shuru</span><input type="range" id="trimStart" min="0" max="100" value="0" step="0.1"><output id="trimStartVal">0.0s</output></div>
-    <div class="rangeRow"><span>Aakhir</span><input type="range" id="trimEnd" min="0" max="100" value="100" step="0.1"><output id="trimEndVal">0.0s</output></div>
-    <label class="f">Cut ki speed</label>
+    <p class="hint">This is your edit: blue blocks on V1 are your cuts, the green track below is your song. Tap a block to select it.</p>
+    <div class="rangeRow"><span>Start</span><input type="range" id="trimStart" min="0" max="100" value="0" step="0.1"><output id="trimStartVal">0.0s</output></div>
+    <div class="rangeRow"><span>End</span><input type="range" id="trimEnd" min="0" max="100" value="100" step="0.1"><output id="trimEndVal">0.0s</output></div>
+    <label class="f">Cut speed</label>
     <select id="cutRate">
-      <option value="auto">Auto (style ke hisaab se)</option>
-      <option value="1">Har beat par cut (sabse tez)</option>
-      <option value="2">Har 2 beat par</option>
-      <option value="4">Har 4 beat par (shaant)</option>
-      <option value="strong">Sirf strong beat / drop par</option>
+      <option value="auto">Auto (based on style)</option>
+      <option value="1">Cut on every beat (fastest)</option>
+      <option value="2">Every 2 beats</option>
+      <option value="4">Every 4 beats (calm)</option>
+      <option value="strong">Only on strong beats / drop</option>
     </select>
-    <label class="f">✂ Segment edit — timeline patti par kisi hisse ko tap karke chuno, phir use badlo</label>
-    <div id="segInfo" class="hint">Abhi koi hissa nahi chuna. Upar wali patti par tap karo.</div>
-    <label class="f">Chune hisse me konsi clip/photo</label>
-    <select id="segClip"><option value="-1">Auto (baari-baari se)</option></select>
-    <label class="f">Chune hisse ki speed</label>
+    <label class="f">✂ Segment edit — tap a part on the timeline to select it, then change it</label>
+    <div id="segInfo" class="hint">No part selected yet. Tap the timeline above.</div>
+    <label class="f">Clip/photo in the selected part</label>
+    <select id="segClip"><option value="-1">Auto (round-robin)</option></select>
+    <label class="f">Speed of the selected part</label>
     <select id="segSpeed">
-      <option value="">Auto</option><option value="0.5">0.5× — dheema</option><option value="0.8">0.8×</option><option value="1">1× — normal</option><option value="1.3">1.3×</option><option value="1.6">1.6× — tez</option><option value="2">2× — bahut tez</option>
+      <option value="">Auto</option><option value="0.5">0.5× — slow</option><option value="0.8">0.8×</option><option value="1">1× — normal</option><option value="1.3">1.3×</option><option value="1.6">1.6× — fast</option><option value="2">2× — very fast</option>
     </select>
-    <label class="f">Chune hisse ka transition</label>
+    <label class="f">Transition of the selected part</label>
     <select id="segTrans">
-      <option value="">Auto</option><option value="none">Seedha cut</option><option value="fade">Fade</option><option value="slide">Slide</option>
+      <option value="">Auto</option><option value="none">Straight cut</option><option value="fade">Fade</option><option value="slide">Slide</option>
     </select>
-    <label class="f">Chune hisse ka zoom punch</label>
+    <label class="f">Zoom punch of the selected part</label>
     <select id="segZoom">
-      <option value="">Auto</option><option value="0">Band</option><option value="0.7">Halka</option><option value="1">Normal</option><option value="1.6">Zordaar</option>
+      <option value="">Auto</option><option value="0">Off</option><option value="0.7">Light</option><option value="1">Normal</option><option value="1.6">Strong</option>
     </select>
     <div class="chips" style="margin-top:12px">
-      <button class="chip" id="btnSegSplit" type="button">✂ Beech se kaato</button>
-      <button class="chip" id="btnSegDel" type="button">🗑 Ye hissa hatao</button>
+      <button class="chip" id="btnSegSplit" type="button">✂ Split in the middle</button>
+      <button class="chip" id="btnSegDel" type="button">🗑 Delete this part</button>
     </div>
-    <p class="hint">Note: AUTO EDIT ya trim badalne par hisse dobara bante hain, haath wale badlaav reset ho jayenge.</p>
+    <p class="hint">Note: AUTO EDIT or changing the trim rebuilds the parts — manual changes will reset.</p>
   </div>
 
   <div class="card cardStyle">
     <h2>3 · Style &amp; effects</h2>
     <div class="chips" id="presets">
-      <button class="chip on" data-preset="auto">🤖 Auto — gaane ke hisaab se</button>
-      <button class="chip" data-preset="funk">🔥 Funk Dhamaaka</button>
+      <button class="chip on" data-preset="auto">🤖 Auto — based on the song</button>
+      <button class="chip" data-preset="funk">🔥 Funk Blast</button>
       <button class="chip" data-preset="lyrics">👑 Lyrics King</button>
       <button class="chip" data-preset="dreamy">🌹 Dreamy Romantic</button>
       <button class="chip" data-preset="cinematic">🎬 Cinematic</button>
     </div>
     <div class="checks" style="margin-top:12px">
-      <label><input type="checkbox" id="fxGlitch" checked> Drop par glitch</label>
+      <label><input type="checkbox" id="fxGlitch" checked> Glitch on drop</label>
       <label><input type="checkbox" id="fxShake" checked> Beat shake</label>
-      <label><input type="checkbox" id="fxFlash" checked> Strong beat par flash</label>
-      <label><input type="checkbox" id="fxZoom" checked> Cut par zoom punch</label>
-      <label><input type="checkbox" id="fxStickers" checked> Sparkle / dil stickers</label>
+      <label><input type="checkbox" id="fxFlash" checked> Flash on strong beats</label>
+      <label><input type="checkbox" id="fxZoom" checked> Zoom punch on cuts</label>
+      <label><input type="checkbox" id="fxStickers" checked> Sparkle / heart stickers</label>
       <label><input type="checkbox" id="fxVignette" checked> Vignette</label>
     </div>
     <label class="f">Quality</label>
     <div class="checks">
-      <label><input type="checkbox" id="qEnhance" checked> Rang saaf + contrast</label>
+      <label><input type="checkbox" id="qEnhance" checked> Clean colour + contrast</label>
       <label><input type="checkbox" id="qSharp" checked> Sharpen</label>
     </div>
     <label class="f">Export size</label>
     <select id="qSize">
-      <option value="720">720 × 1280 (tez)</option>
-      <option value="1080">1080 × 1920 HD (dheema)</option>
+      <option value="720">720 × 1280 (fast)</option>
+      <option value="1080">1080 × 1920 HD (slower)</option>
     </select>
   </div>
 
   <div class="card cardText">
     <h2>4 · Text / lyrics</h2>
-    <label class="f">Shuruaat ka bada text (hook) — khali bhi chalega</label>
+    <label class="f">Big opening text (hook) — can be left empty</label>
     <input type="text" id="hookText" placeholder="e.g. LADDO RANI 🔥">
-    <label class="f">Lyrics — ek line per line (Hinglish chalega)</label>
-    <textarea id="lyrics" placeholder="udi udi jaaye
-dil ki patang dekho
-udi udi jaaye"></textarea>
-    <label class="f">Text ka andaaz</label>
+    <label class="f">Lyrics — one line per line</label>
+    <textarea id="lyrics" placeholder="type your first line here
+second line goes here
+third line here"></textarea>
+    <label class="f">Text style</label>
     <select id="textStyle">
-      <option value="wordpop">Shabd-dar-shabd — bada pop (funk)</option>
-      <option value="wordcards">Word cards — laal akshar, kaala parda</option>
-      <option value="wordrotate">Shabd-dar-shabd — ghoom kar entry</option>
-      <option value="wordslam">Shabd-dar-shabd — zor se slam (bada → chhota)</option>
-      <option value="linefade">Line-dar-line — naram fade</option>
+      <option value="wordpop">Word by word — big pop (funk)</option>
+      <option value="wordcards">Word cards — red letters, black screen</option>
+      <option value="wordrotate">Word by word — spin-in entry</option>
+      <option value="wordslam">Word by word — slam (big → small)</option>
+      <option value="linefade">Line by line — soft fade</option>
     </select>
-    <label class="f">Chhota naam kone me (watermark, chaaho to)</label>
-    <input type="text" id="watermark" placeholder="e.g. apne channel ka naam">
+    <label class="f">Small name in the corner (watermark, optional)</label>
+    <input type="text" id="watermark" placeholder="e.g. your channel name">
   </div>
 
   <div class="card cardPro">
-    <h2>5 · Pro Edit — haath se control (After Effects style)</h2>
-    <p class="hint">Ye slider turant preview me dikhte hain — apne hisaab se zor kam-zayada karo. 100% matlab normal.</p>
+    <h2>5 · Pro Edit — manual control (After Effects style)</h2>
+    <p class="hint">These sliders change the preview instantly — tune them your way. 100% means normal.</p>
     <div class="rangeRow"><span>Zoom punch</span><input type="range" id="mZoom" min="0" max="200" value="100" step="5"><output id="mZoomVal">100%</output></div>
     <div class="rangeRow"><span>Beat shake</span><input type="range" id="mShake" min="0" max="200" value="100" step="5"><output id="mShakeVal">100%</output></div>
     <div class="rangeRow"><span>Clip speed</span><input type="range" id="mSpd" min="50" max="200" value="100" step="5"><output id="mSpdVal">100%</output></div>
@@ -212,18 +212,18 @@ udi udi jaaye"></textarea>
     <div class="rangeRow"><span>Text glow</span><input type="range" id="mGlow" min="0" max="200" value="100" step="5"><output id="mGlowVal">100%</output></div>
     <div class="rangeRow"><span>Brightness</span><input type="range" id="mBri" min="50" max="150" value="100" step="2"><output id="mBriVal">100%</output></div>
     <div class="rangeRow"><span>Contrast</span><input type="range" id="mCon" min="50" max="200" value="100" step="2"><output id="mConVal">100%</output></div>
-    <div class="rangeRow"><span>Rang (saturation)</span><input type="range" id="mSat" min="0" max="200" value="100" step="2"><output id="mSatVal">100%</output></div>
+    <div class="rangeRow"><span>Colour (saturation)</span><input type="range" id="mSat" min="0" max="200" value="100" step="2"><output id="mSatVal">100%</output></div>
     <div class="rangeRow"><span>Blur</span><input type="range" id="mBlur" min="0" max="8" value="0" step="0.5"><output id="mBlurVal">0px</output></div>
-    <label class="f">Cut par transition</label>
+    <label class="f">Transition on cuts</label>
     <select id="mTrans">
-      <option value="none">Koi nahi (seedha cut)</option>
+      <option value="none">None (straight cut)</option>
       <option value="fade">Fade in</option>
       <option value="slide">Slide entry</option>
     </select>
   </div>
 
   <button id="btnExport" disabled>⬇ VIDEO DOWNLOAD KARO</button>
-  <p class="hint" style="text-align:center">Export utna hi time lega jitna lamba gaana hai (real-time render). MP4 mile to MP4, nahi to WebM download hoga.</p>
+  <p class="hint" style="text-align:center">Export takes as long as the song is (real-time render). You get MP4 if supported, otherwise WebM.</p>
 
   <footer>BeatCut Studio v2 — tumhari files device se bahar nahi jaati.</footer>
 </div>
@@ -270,7 +270,7 @@ $("fileClips").addEventListener("change", e => {
     el.addEventListener("loadeddata", () => { if (S.ready) drawFrame(previewT()); });
     return { el };
   });
-  if (S.clips.length) setStatus(S.clips.length + " clip(s) add ho gayi ✅ Ab gaana add karo (ya Auto Edit dabao).");
+  if (S.clips.length) setStatus(S.clips.length + " clip(s) added ✅ Now add a song (or press Auto Edit).");
   refreshReady();
 });
 $("filePhotos").addEventListener("change", e => {
@@ -280,12 +280,12 @@ $("filePhotos").addEventListener("change", e => {
     img.onload = () => { S.photos.push({ img }); refreshReady(); if (S.ready) drawFrame(previewT()); };
     img.src = URL.createObjectURL(f);
   });
-  if (e.target.files.length) setStatus("Photos load ho rahi hain…");
+  if (e.target.files.length) setStatus("Loading photos…");
 });
 $("fileSong").addEventListener("change", async e => {
   const f = e.target.files[0]; if (!f) return;
   songEl.src = URL.createObjectURL(f);
-  setStatus("Gaana sun raha hu… beat dhoond raha hu 🎧");
+  setStatus("Listening to the song… finding the beats 🎧");
   let buf;
   try {
     const raw = await f.arrayBuffer();
@@ -294,14 +294,14 @@ $("fileSong").addEventListener("change", async e => {
     buf = await ac.decodeAudioData(raw);
     try { await ac.close(); } catch(_){}
   } catch (err) {
-    setStatus("❌ Ye gaana file padh nahi paya — koi dusri audio file (mp3) try karo.");
+    setStatus("❌ Couldn't read this song file — try another audio file (mp3).");
     return;
   }
   S.songBuf = buf; S.duration = buf.duration; S.t0 = 0; S.t1 = buf.duration;
   $("trimStart").max = buf.duration; $("trimEnd").max = buf.duration;
   $("trimStart").value = 0; $("trimEnd").value = buf.duration;
   $("trimStartVal").textContent = "0.0s"; $("trimEndVal").textContent = buf.duration.toFixed(1) + "s";
-  try { analyseBeats(); } catch (err) { setStatus("❌ Beat analysis me dikkat aayi — dusra gaana try karo."); return; }
+  try { analyseBeats(); } catch (err) { setStatus("❌ Beat analysis failed — try another song."); return; }
   refreshReady();
 });
 
@@ -339,7 +339,7 @@ function analyseBeats() {
   if (beats.length > 2) { const gaps = []; for (let i = 1; i < beats.length; i++) gaps.push(beats[i].t - beats[i-1].t); gaps.sort((x, y) => x - y); bpm = Math.round(60 / gaps[Math.floor(gaps.length / 2)]); }
   S.bpm = bpm;
   S.seed = (Math.floor(S.duration * 97) ^ (beats.length * 131) ^ (bpm * 17) ^ (buf.length % 100000)) | 0;
-  $("beatInfo").textContent = "✅ Gaana samajh gaya: " + beats.length + " beats" + (bpm ? " · ~" + bpm + " BPM" : "") + " · " + Math.round(S.duration) + "s" + (S.preset === "auto" ? " · Style khud chuna: " + ({ funk: "🔥 Funk Dhamaaka", lyrics: "👑 Lyrics King", dreamy: "🌹 Dreamy Romantic", cinematic: "🎬 Cinematic" })[effPreset()] : "");
+  $("beatInfo").textContent = "✅ Song understood: " + beats.length + " beats" + (bpm ? " · ~" + bpm + " BPM" : "") + " · " + Math.round(S.duration) + "s" + (S.preset === "auto" ? " · Style auto-picked: " + ({ funk: "🔥 Funk Blast", lyrics: "👑 Lyrics King", dreamy: "🌹 Dreamy Romantic", cinematic: "🎬 Cinematic" })[effPreset()] : "");
 }
 
 /* ---------------- timeline build ---------------- */
@@ -447,7 +447,7 @@ function drawTimelineStrip() {
       g.fillRect(GUT + i * colW, midY - h, colW - 1, h * 2);
     }
     g.fillStyle = "rgba(255,255,255,0.5)"; g.font = Math.round(15 * s) + "px system-ui";
-    g.fillText("Gaana — beat par kata hua", GUT + 8 * s, 132 * s);
+    g.fillText("Song — cut on the beat", GUT + 8 * s, 132 * s);
   }
   // playhead
   const px = xOf(Math.min(Math.max(previewT(), S.t0), S.t1));
@@ -458,7 +458,7 @@ function refreshReady() {
   S.ready = !!S.songBuf && (S.clips.length > 0 || S.photos.length > 0 || true);
   const has = !!S.songBuf;
   $("btnPlay").disabled = !has; $("btnExport").disabled = !has; $("btnExportTop").disabled = !has; $("btnAuto").disabled = !has;
-  if (has) { buildTimeline(); setStatus("Taiyaar ✅ Play dabakar dekho, ya seedha Export karo."); drawFrame(previewT()); }
+  if (has) { buildTimeline(); setStatus("Ready ✅ Press Play to watch, or Export directly."); drawFrame(previewT()); }
 }
 
 /* ---------------- drawing ---------------- */
@@ -691,7 +691,7 @@ function loop() {
   if (!S.playing && !S.exporting) return;
   rafId = requestAnimationFrame(loop); // schedule first: one bad frame can never freeze the edit
   try { drawFrame(songEl.currentTime); } catch (err) {
-    if (!S.errShown) { S.errShown = true; setStatus("⚠️ Preview me ek frame par dikkat aayi — dobara Play dabao. (" + (err && err.message ? err.message : "error") + ")"); }
+    if (!S.errShown) { S.errShown = true; setStatus("⚠️ A frame glitched in the preview — press Play again. (" + (err && err.message ? err.message : "error") + ")"); }
   }
   const ct = songEl.currentTime;
   $("timeLabel").textContent = Math.max(0, ct - S.t0).toFixed(1) + "s / " + (S.t1 - S.t0).toFixed(1) + "s";
@@ -717,7 +717,7 @@ songEl.addEventListener("ended", () => { if (!S.exporting) stopPlay(); });
 $("btnAuto").addEventListener("click", () => {
   if (!S.songBuf) return;
   ensureTimeline();
-  setStatus("⚡ Auto Edit taiyaar — " + S.segments.length + " cuts beat par lag gaye. Play dabakar dekho!");
+  setStatus("⚡ Auto Edit ready — " + S.segments.length + " cuts placed on the beat. Press Play to watch!");
   window.scrollTo({ top: 0, behavior: "smooth" });
   if (!S.playing) $("btnPlay").click();
 });
@@ -751,7 +751,7 @@ $("btnExport").addEventListener("click", async () => {
   const mime = pickMime();
   let rec;
   try { rec = new MediaRecorder(new MediaStream(tracks), mime ? { mimeType: mime, videoBitsPerSecond: 8_000_000 } : { videoBitsPerSecond: 8_000_000 }); }
-  catch (e) { setStatus("❌ Is browser me video export support nahi hai — Chrome me try karo."); canvas.width = W; canvas.height = H; return; }
+  catch (e) { setStatus("❌ This browser doesn't support video export — try Chrome."); canvas.width = W; canvas.height = H; return; }
   const chunks = [];
   rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
   rec.onstop = () => {
@@ -762,16 +762,16 @@ $("btnExport").addEventListener("click", async () => {
     const a = document.createElement("a");
     a.href = url; a.download = fname; a.click();
     const dl = $("dlLink"); dl.href = url; dl.download = fname; dl.style.display = "block";
-    dl.textContent = "⬇ Yahi se download karo — video taiyaar hai (" + (isMp4 ? "MP4" : "WebM") + ")";
+    dl.textContent = "⬇ Download from here — your video is ready (" + (isMp4 ? "MP4" : "WebM") + ")";
     setTimeout(() => URL.revokeObjectURL(url), 600000);
     S.exporting = false; $("btnExport").disabled = false; $("btnExportTop").disabled = false; $("btnPlay").disabled = false;
     canvas.width = W; canvas.height = H; buildTimeline(); drawFrame(previewT());
-    setStatus("✅ Ho gaya! Video taiyaar hai — preview ke neeche wale hare DOWNLOAD button se le lo.");
+    setStatus("✅ Done! Your video is ready — download it from the green button below the preview.");
   };
   buildTimeline();
   S.exporting = true; $("btnExport").disabled = true; $("btnExportTop").disabled = true; $("btnPlay").disabled = true;
   try { songEl.currentTime = S.t0; } catch(_){}
-  setStatus("🎬 Video ban raha hai… tab khula rakho, gaana pura chalega.");
+  setStatus("🎬 Rendering your video… keep this tab open, the song will play fully.");
   rec.start(250);
   try { await songEl.play(); } catch(_){}
   loop();
@@ -800,11 +800,11 @@ function syncSegUI() {
   const sc = $("segClip");
   const n = S.clips.length || S.photos.length;
   const kind = S.clips.length ? "Clip" : "Photo";
-  let opts = '<option value="-1">Auto (baari-baari se)</option>';
+  let opts = '<option value="-1">Auto (round-robin)</option>';
   for (let i = 0; i < n; i++) opts += '<option value="' + i + '">' + kind + " " + (i + 1) + "</option>";
   sc.innerHTML = opts;
-  if (!sg) { info.textContent = "Abhi koi hissa nahi chuna. Upar wali patti par tap karo."; return; }
-  info.textContent = "Chuna hissa: Segment " + (sg.idx + 1) + " · " + sg.start.toFixed(1) + "s – " + sg.end.toFixed(1) + "s · " + kind + " " + (((sg.clipIdx != null ? sg.clipIdx : sg.idx) % Math.max(1, n)) + 1);
+  if (!sg) { info.textContent = "No part selected yet. Tap the timeline above."; return; }
+  info.textContent = "Selected part: Segment " + (sg.idx + 1) + " · " + sg.start.toFixed(1) + "s – " + sg.end.toFixed(1) + "s · " + kind + " " + (((sg.clipIdx != null ? sg.clipIdx : sg.idx) % Math.max(1, n)) + 1);
   sc.value = sg.clipIdx != null ? String(sg.clipIdx) : "-1";
   $("segSpeed").value = sg.mRate != null ? String(sg.mRate) : "";
   $("segTrans").value = sg.mTr != null ? sg.mTr : "";
@@ -826,21 +826,21 @@ $("segSpeed").addEventListener("change", () => { const sg = selSegObj(); if (!sg
 $("segTrans").addEventListener("change", () => { const sg = selSegObj(); if (!sg) return; const v = $("segTrans").value; sg.mTr = v === "" ? undefined : v; if (!S.playing) drawFrame(previewT()); });
 $("segZoom").addEventListener("change", () => { const sg = selSegObj(); if (!sg) return; const v = $("segZoom").value; sg.mZoom = v === "" ? undefined : parseFloat(v); if (!S.playing) drawFrame(previewT()); });
 $("btnSegSplit").addEventListener("click", () => {
-  const sg = selSegObj(); if (!sg) { setStatus("Pehle timeline par tap karke ek hissa chuno."); return; }
-  if (sg.end - sg.start < 0.24) { setStatus("Ye hissa bahut chhota hai, aur nahi kat sakta."); return; }
+  const sg = selSegObj(); if (!sg) { setStatus("First tap the timeline to select a part."); return; }
+  if (sg.end - sg.start < 0.24) { setStatus("This part is too small to split further."); return; }
   const mid = Math.round(((sg.start + sg.end) / 2) * 100) / 100;
   const nu = { start: mid, end: sg.end, idx: sg.idx + 1, zAmt: sg.zAmt, rate: sg.rate, dir: sg.dir, tr: sg.tr, clipIdx: sg.clipIdx, mRate: sg.mRate, mTr: sg.mTr, mZoom: sg.mZoom };
   sg.end = mid;
   S.segments.splice(sg.idx + 1, 0, nu); reindexSegs(); S.selSeg = sg.idx + 1;
-  syncSegUI(); drawTimelineStrip(); setStatus("✂ Hissa beech se kat gaya — ab kul " + S.segments.length + " hisse hain.");
+  syncSegUI(); drawTimelineStrip(); setStatus("✂ Part split in the middle — now " + S.segments.length + " parts in total.");
 });
 $("btnSegDel").addEventListener("click", () => {
-  const sg = selSegObj(); if (!sg) { setStatus("Pehle timeline par tap karke ek hissa chuno."); return; }
-  if (S.segments.length <= 1) { setStatus("Ek hi hissa bacha hai, use nahi hata sakte."); return; }
+  const sg = selSegObj(); if (!sg) { setStatus("First tap the timeline to select a part."); return; }
+  if (S.segments.length <= 1) { setStatus("Only one part left — it can't be deleted."); return; }
   const i = sg.idx;
   if (i > 0) S.segments[i - 1].end = sg.end; else S.segments[1].start = sg.start;
   S.segments.splice(i, 1); reindexSegs(); S.selSeg = Math.min(i, S.segments.length - 1);
-  syncSegUI(); drawTimelineStrip(); setStatus("🗑 Hissa hat gaya — ab kul " + S.segments.length + " hisse hain.");
+  syncSegUI(); drawTimelineStrip(); setStatus("🗑 Part deleted — now " + S.segments.length + " parts in total.");
 });
 function onTrim() {
   let a = parseFloat($("trimStart").value), b = parseFloat($("trimEnd").value);
@@ -866,7 +866,7 @@ ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
 ctx.fillStyle = "#3d4666"; ctx.font = "700 44px system-ui"; ctx.textAlign = "center";
 ctx.fillText("🎬 BeatCut Studio", W / 2, H / 2 - 20);
 ctx.font = "400 30px system-ui"; ctx.fillStyle = "#8a93ad";
-ctx.fillText("Neeche clip + gaana add karo", W / 2, H / 2 + 30);
+ctx.fillText("Add a clip and a song below", W / 2, H / 2 + 30);
 </script>
 </body>
 </html>
