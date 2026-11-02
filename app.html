@@ -36,7 +36,7 @@
     <label>Video clips (1-4) <input type="file" id="clipFiles" accept="video/*" multiple></label>
     <label>Song <input type="file" id="songFile" accept="audio/*"></label>
     <label>Hook text <input type="text" id="hookText" value="O FIRKI WALI"></label>
-    <label>Lyrics — one line per line (can be empty)</label>
+    <label>Lyrics — one line per line (can be empty). Timed line: <i>12.5 | word word word</i> places those words at that second.</label>
     <textarea id="lyrics" rows="3" cols="34"></textarea>
     <label>Video size
       <select id="sizeSel">
@@ -218,7 +218,13 @@ function drawTimeline() {
     d.style.width = Math.max(0.8, (sg.end - sg.start) / S.DUR * 100) + "%";
     d.style.background = COL[sg.clipIdx % COL.length];
     d.innerHTML = "Clip " + (sg.clipIdx + 1) + "<small>" + (sg.end - sg.start).toFixed(1) + "s" + (sg.rate !== 1 ? " · " + sg.rate + "x" : "") + (sg.punch ? "" : " · no punch") + "</small>";
-    d.addEventListener("click", (ev) => { ev.stopPropagation(); select(i); S.playhead = sg.start; drawPlayhead(); });
+    d.addEventListener("click", (ev) => {
+      ev.stopPropagation(); select(i);
+      // playhead goes to the exact click point (not the part's start) so Split works after a plain click
+      const r = el("track").getBoundingClientRect();
+      S.playhead = Math.min(S.DUR, Math.max(0, (ev.clientX - r.left) / r.width * S.DUR));
+      drawPlayhead();
+    });
     track.appendChild(d);
   });
   drawPlayhead();
@@ -246,7 +252,7 @@ el("track").addEventListener("click", (ev) => {
   drawPlayhead();
 });
 el("splitBtn").addEventListener("click", () => {
-  const i = S.segments.findIndex(sg => S.playhead > sg.start + 0.1 && S.playhead < sg.end - 0.1);
+  const i = S.segments.findIndex(sg => S.playhead > sg.start + 0.03 && S.playhead < sg.end - 0.03);
   if (i < 0) { say("Playhead is not inside a part — click the timeline to place it inside a part first."); return; }
   const sg = S.segments[i];
   const a = { ...sg, end: S.playhead }, b = { ...sg, start: S.playhead };
@@ -345,10 +351,25 @@ el("render").addEventListener("click", async () => {
     const lines = el("lyrics").value.split("\n").map(x => x.trim()).filter(Boolean);
     const wordTimes = [];
     {
+      /* timed lines "12.5 | word word" land at their real second (e.g. from speech-to-text);
+         plain lines are spread over the strong beats, as before */
+      const timed = [], plain = [];
+      lines.forEach(line => {
+        const m = line.match(/^\s*(\d+(?:\.\d+)?)\s*\|\s*(.+)$/);
+        if (m) timed.push({ t: parseFloat(m[1]), words: m[2].split(/\s+/).filter(Boolean) });
+        else plain.push(line);
+      });
+      timed.sort((a, b) => a.t - b.t);
+      timed.forEach((tl, i) => {
+        const end = i + 1 < timed.length ? timed[i + 1].t : Math.min(DUR, tl.t + 3);
+        const span = Math.max(0.4, end - tl.t);
+        tl.words.forEach((w, wi) => wordTimes.push({ word: w, t: tl.t + span * (wi / Math.max(1, tl.words.length)) }));
+      });
       const t0 = hook ? 1.6 : 0;
       const pool = inRange.filter(b => b.t >= t0 && b.s > 0.3);
       let bi = 0;
-      lines.forEach(line => line.split(/\s+/).filter(Boolean).forEach(w => { if (bi < pool.length) wordTimes.push({ word: w, t: pool[bi++].t }); }));
+      plain.forEach(line => line.split(/\s+/).filter(Boolean).forEach(w => { if (bi < pool.length) wordTimes.push({ word: w, t: pool[bi++].t }); }));
+      wordTimes.sort((a, b) => a.t - b.t);
     }
     const clipData = [];
     for (const f of S.clipFiles) {
