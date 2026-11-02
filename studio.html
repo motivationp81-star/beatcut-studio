@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BeatCut Studio — Auto beat edit</title>
+<style>
+  * { box-sizing: border-box; }
+  body { background:#14161c; color:#e8eaf0; font-family:system-ui, sans-serif; margin:0; padding:18px; }
+  h1 { font-size:22px; margin:4px 0 2px; }
+  .sub { color:#9aa3b2; font-size:13px; margin-bottom:14px; }
+  .card { background:#1b1e26; border:1px solid #2a2e3a; border-radius:12px; padding:14px; margin-bottom:12px; }
+  label.f { display:block; font-size:13px; color:#c9cfdb; margin:10px 0 5px; }
+  input[type=file], input[type=text], textarea, select { width:100%; background:#0c0e12; color:#e8eaf0; border:1px solid #333847; border-radius:8px; padding:9px; font-size:14px; }
+  textarea { min-height:74px; resize:vertical; }
+  .chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:6px; }
+  .chip { background:#0c0e12; color:#e8eaf0; border:1px solid #3a4054; border-radius:999px; padding:8px 14px; cursor:pointer; font-size:14px; }
+  .chip.on { background:#ffd23e; color:#111; border-color:#ffd23e; font-weight:700; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; }
+  .row > div { flex:1; min-width:160px; }
+  button.primary { background:#ffd23e; color:#111; border:0; padding:12px 22px; font-weight:800; border-radius:9px; cursor:pointer; font-size:15px; }
+  button.ghost { background:#232733; color:#e8eaf0; border:1px solid #3a4054; padding:12px 18px; font-weight:700; border-radius:9px; cursor:pointer; font-size:15px; }
+  button:disabled { opacity:.45; cursor:default; }
+  #status { background:#0c0e12; border-radius:8px; padding:12px; white-space:pre-wrap; min-height:52px; font-size:13px; margin-top:12px; }
+  #parts { display:flex; flex-wrap:wrap; gap:4px; margin-top:10px; }
+  #parts span { height:14px; border-radius:3px; display:inline-block; }
+  a { color:#ffd23e; }
+  .small { font-size:12px; color:#9aa3b2; }
+</style>
+</head>
+<body>
+<h1>🎬 BeatCut Studio</h1>
+<div class="sub">The original auto-editor, rebuilt on the frame-exact engine: same one-tap beat edit — sharp quality, smooth effects, cuts exactly on the beat. Manual fine-tuning lives in the <a href="app.html">timeline editor</a>. The very first version is kept at <a href="old.html">old.html</a>.</div>
+
+<div class="card">
+  <label class="f">Video clips (one or more) — or leave empty and use photos / song-only</label>
+  <input type="file" id="clips" accept="video/*" multiple>
+  <label class="f">Photos (optional — for a photo collage edit)</label>
+  <input type="file" id="photos" accept="image/*" multiple>
+  <label class="f">Song (your own audio file)</label>
+  <input type="file" id="song" accept="audio/*">
+  <label class="f">Edit style</label>
+  <div class="chips" id="presets">
+    <button class="chip on" data-preset="auto">🤖 Auto — based on the song</button>
+    <button class="chip" data-preset="funk">🔥 Funk Blast</button>
+    <button class="chip" data-preset="lyrics">👑 Lyrics King</button>
+    <button class="chip" data-preset="dreamy">🌹 Dreamy Romantic</button>
+    <button class="chip" data-preset="cinematic">🎬 Cinematic</button>
+  </div>
+  <div class="row">
+    <div>
+      <label class="f">Cut speed</label>
+      <select id="cutRate">
+        <option value="auto" selected>Auto (from style)</option>
+        <option value="1">Every beat — fastest</option>
+        <option value="2">Every 2 beats</option>
+        <option value="4">Every 4 beats — calm</option>
+        <option value="strong">Strong beats only</option>
+      </select>
+    </div>
+    <div>
+      <label class="f">Video size</label>
+      <select id="size">
+        <option value="720x1280" selected>9:16 — Reels / Shorts (720×1280)</option>
+        <option value="720x900">4:5 — Feed post (720×900)</option>
+        <option value="720x720">1:1 — Square (720×720)</option>
+        <option value="1280x720">16:9 — YouTube (1280×720)</option>
+      </select>
+    </div>
+  </div>
+  <label class="f">Hook text (big text at the start — optional)</label>
+  <input type="text" id="hook" placeholder="e.g. O FIRKI WALI">
+  <label class="f">Lyrics — one full line per row. Lines are placed automatically on strong beats, or give a time like: 12.5 | your line</label>
+  <textarea id="lyrics" placeholder="One full lyric line per row — no need to type timings for plain lines."></textarea>
+  <div class="small" style="margin-top:6px">Tip: don't want to type lyrics at all? Send the song to Muse and the finished video comes back with the text written in.</div>
+  <div class="row" style="margin-top:14px">
+    <div><button class="primary" id="build" style="width:100%">⚡ BUILD MY EDIT</button></div>
+    <div><button class="ghost" id="render" style="width:100%" disabled>RENDER + DOWNLOAD MP4</button></div>
+  </div>
+  <div id="parts"></div>
+  <div id="status">Add clips (or photos) and a song, then press BUILD MY EDIT.</div>
+</div>
+
+<script type="module">
+import * as MB from "https://cdn.jsdelivr.net/npm/mediabunny@1.65.0/+esm";
+const el = (id) => document.getElementById(id);
+const statusEl = el("status");
+const say = (m) => { statusEl.textContent += "\n" + m; };
+statusEl.textContent = "Engine: " + (MB.Input ? "ready" : "FAILED to load") + " — add clips (or photos) and a song, then press BUILD MY EDIT.";
+
+/* ---------- beat analysis (3-band flux + tempo fold + snapped grid) ---------- */
+async function renderBand(buf, makeFilter) {
+  const sr = buf.sampleRate;
+  const off = new OfflineAudioContext(1, buf.length, sr);
+  const src = off.createBufferSource(); src.buffer = buf;
+  makeFilter(off, src).connect(off.destination);
+  src.start();
+  return (await off.startRendering()).getChannelData(0);
+}
+function bandFlux(samples, hop) {
+  const n = Math.floor(samples.length / hop);
+  const rms = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    let s = 0; const st = i * hop;
+    for (let j = 0; j < hop; j++) { const v = samples[st + j]; s += v * v; }
+    rms[i] = Math.sqrt(s / hop + 1e-12);
+  }
+  const flux = new Float32Array(n);
+  for (let i = 1; i < n; i++) flux[i] = Math.max(0, rms[i] - rms[i - 1]);
+  const sorted = [...flux].sort((a, b) => a - b);
+  const p99 = sorted[Math.floor(sorted.length * 0.99)] || 1;
+  for (let i = 0; i < n; i++) flux[i] = Math.min(2, flux[i] / Math.max(p99, 1e-9));
+  return flux;
+}
+async function analyseBeats(buf) {
+  const sr = buf.sampleRate, hop = 256, fps = sr / hop;
+  const [low, mid, high] = await Promise.all([
+    renderBand(buf, (off, src) => { const f = off.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = 160; src.connect(f); return f; }),
+    renderBand(buf, (off, src) => { const f = off.createBiquadFilter(); f.type = "bandpass"; f.frequency.value = 1200; f.Q.value = 0.6; src.connect(f); return f; }),
+    renderBand(buf, (off, src) => { const f = off.createBiquadFilter(); f.type = "highpass"; f.frequency.value = 4000; src.connect(f); return f; }),
+  ]);
+  const fl = bandFlux(low, hop), fm = bandFlux(mid, hop), fh = bandFlux(high, hop);
+  const n = Math.min(fl.length, fm.length, fh.length);
+  const env = new Float32Array(n);
+  let envMax = 0.0001;
+  for (let i = 0; i < n; i++) { env[i] = fl[i] + 0.6 * fm[i] + 0.4 * fh[i]; if (env[i] > envMax) envMax = env[i]; }
+  for (let i = 0; i < n; i++) env[i] /= envMax;
+  const W = Math.floor(0.75 * fps), peaks = [];
+  const csum = new Float32Array(n + 1);
+  for (let i = 0; i < n; i++) csum[i + 1] = csum[i] + env[i];
+  const localMean = (i) => { const a = Math.max(0, i - W), b = Math.min(n, i + W + 1); return (csum[b] - csum[a]) / (b - a); };
+  let last = -1e9;
+  for (let i = 1; i < n - 1; i++) {
+    if (env[i] > localMean(i) * 1.3 + 0.05 && env[i] >= env[i - 1] && env[i] >= env[i + 1] && i - last >= 0.24 * fps) {
+      peaks.push({ i, t: i / fps, s: env[i] }); last = i;
+    }
+  }
+  if (peaks.length < 6) return { beats: peaks.map(p => ({ t: p.t, s: Math.min(1, p.s) })), bpm: 0 };
+  const iois = []; for (let i = 1; i < peaks.length; i++) iois.push(peaks[i].t - peaks[i - 1].t);
+  iois.sort((a, b) => a - b);
+  let P = iois[Math.floor(iois.length / 2)];
+  while (P < 0.35) P *= 2;
+  while (P > 0.75) P /= 2;
+  const bpm = Math.round(60 / P);
+  const dur = n / fps;
+  let bestOff = 0, bestVal = -1;
+  for (let off = 0; off < P; off += 1 / fps) {
+    let sum = 0, cnt = 0;
+    for (let t = off; t < dur; t += P) { sum += env[Math.min(n - 1, Math.round(t * fps))]; cnt++; }
+    if (cnt && sum / cnt > bestVal) { bestVal = sum / cnt; bestOff = off; }
+  }
+  const beats = [];
+  for (let t = bestOff; t < dur; t += P) {
+    let snap = null;
+    for (const p of peaks) { if (Math.abs(p.t - t) <= 0.11 && (!snap || p.s > snap.s)) snap = p; }
+    if (snap) beats.push({ t: snap.t, s: Math.min(1, snap.s) });
+    else beats.push({ t, s: Math.min(0.2, env[Math.min(n - 1, Math.round(t * fps))]) });
+  }
+  return { beats, bpm };
+}
+async function pickAudioCodec(chCount, sr) {
+  for (const [name, full] of [["aac", "mp4a.40.2"], ["opus", "opus"]]) {
+    try {
+      const sup = await AudioEncoder.isConfigSupported({ codec: full, sampleRate: sr, numberOfChannels: chCount, bitrate: 128000 });
+      if (sup.supported) return name;
+    } catch (e) { /* next */ }
+  }
+  return null;
+}
+
+/* ---------- the original editor's style brain ---------- */
+const PRESETS = {
+  funk:      { beatsPerCut: 1, shake: 0.7,  zoomPunch: 0.22, grade: "contrast(1.07) saturate(1.07)", label: "🔥 Funk Blast" },
+  lyrics:    { beatsPerCut: 2, shake: 0.4,  zoomPunch: 0.16, grade: "contrast(1.05) saturate(1.08)", label: "👑 Lyrics King" },
+  dreamy:    { beatsPerCut: 4, shake: 0.15, zoomPunch: 0.07, grade: "brightness(1.04) saturate(1.12)", label: "🌹 Dreamy Romantic" },
+  cinematic: { beatsPerCut: 4, shake: 0.2,  zoomPunch: 0.10, grade: "contrast(1.18) saturate(0.82) brightness(0.96)", label: "🎬 Cinematic" },
+};
+const S = { preset: "auto", clipFiles: [], photoFiles: [], songBuf: null, beats: [], bpm: 0, DUR: 0, segments: [], lineCaps: [], hook: "", built: false };
+function effPreset() {
+  if (S.preset !== "auto") return S.preset;
+  if (S.bpm >= 120) return "funk";
+  if (S.bpm >= 96) return "lyrics";
+  if (S.bpm > 0) return "dreamy";
+  return "lyrics";
+}
+el("presets").querySelectorAll(".chip").forEach(b => b.addEventListener("click", () => {
+  el("presets").querySelectorAll(".chip").forEach(x => x.classList.remove("on"));
+  b.classList.add("on"); S.preset = b.dataset.preset; S.built = false; el("render").disabled = true;
+}));
+el("clips").addEventListener("change", e => { S.clipFiles = [...e.target.files]; S.built = false; el("render").disabled = true; });
+el("photos").addEventListener("change", e => { S.photoFiles = [...e.target.files]; S.built = false; el("render").disabled = true; });
+el("song").addEventListener("change", async (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  statusEl.textContent = "Reading the song…";
+  const actx = new AudioContext();
+  S.songBuf = await actx.decodeAudioData(await f.arrayBuffer());
+  S.DUR = S.songBuf.duration;
+  statusEl.textContent = "Song loaded: " + S.DUR.toFixed(1) + "s. Press BUILD MY EDIT.";
+  S.built = false; el("render").disabled = true;
+});
+
+el("build").addEventListener("click", async () => {
+  if (!S.songBuf) { statusEl.textContent = "Add a song first."; return; }
+  el("build").disabled = true;
+  statusEl.textContent = "Listening to the song — finding every beat…";
+  try {
+    const { beats, bpm } = await analyseBeats(S.songBuf);
+    S.beats = beats; S.bpm = bpm;
+    const P = PRESETS[effPreset()];
+    const mode = S.clipFiles.length ? "clips" : (S.photoFiles.length ? "photos" : "visual");
+    /* cut times from the beat grid, the original editor's way */
+    const rate = el("cutRate").value;
+    const inRange = beats.filter(b => b.t < S.DUR);
+    const cutTimes = [0];
+    if (rate === "strong") {
+      inRange.filter(b => b.s > 0.62).forEach(b => cutTimes.push(b.t));
+    } else {
+      let step = rate === "auto" ? P.beatsPerCut : parseInt(rate, 10);
+      if (rate === "auto" && bpm > 160) step *= 2;
+      const minGap = bpm > 160 ? 0.5 : 0.3, minGap2 = bpm > 160 ? 0.42 : 0.25;
+      let since = 0, lastCut = 0;
+      inRange.forEach(b => {
+        since++;
+        const strong = b.s > 0.75, weak = b.s < 0.22;
+        if ((since >= step && !weak) || (strong && since >= 1 && b.t - lastCut > minGap) || (since >= step * 2)) {
+          if (b.t - lastCut > minGap2) { cutTimes.push(b.t); lastCut = b.t; since = 0; }
+        }
+      });
+    }
+    cutTimes.push(S.DUR);
+    const uniq = [...new Set(cutTimes.map(x => Math.round(x * 100) / 100))].sort((a, b) => a - b);
+    S.segments = [];
+    for (let i = 0; i < uniq.length - 1; i++) {
+      if (uniq[i + 1] - uniq[i] < 0.12) continue;
+      const beat = inRange.find(b => Math.abs(b.t - uniq[i]) < 0.08);
+      const strong = beat ? beat.s : 0.45;
+      const funky = effPreset() === "funk";
+      S.segments.push({
+        start: uniq[i], end: uniq[i + 1], strong,
+        idx: S.segments.length,
+        clipIdx: mode === "clips" ? S.segments.length % S.clipFiles.length : (mode === "photos" ? S.segments.length % S.photoFiles.length : 0),
+        srcStart: 0,
+        rate: funky ? (strong > 0.8 ? 1.25 : (strong < 0.25 ? 0.9 : 1)) : 1,
+        zAmt: 0.7 + strong * 0.9,
+        kb: S.segments.length % 2 ? -1 : 1,
+      });
+    }
+    /* lyric lines: timed lines honoured; plain lines go on strong-beat slots */
+    S.hook = el("hook").value.trim();
+    const raw = el("lyrics").value.split("\n").map(x => x.trim()).filter(Boolean);
+    const timed = [], plain = [];
+    raw.forEach(line => {
+      const m = line.match(/^(\d+(?:\.\d+)?)\s*\|\s*(.+)$/);
+      if (m) timed.push({ start: parseFloat(m[1]), text: m[2].trim() }); else plain.push(line);
+    });
+    S.lineCaps = [];
+    timed.sort((a, b) => a.start - b.start);
+    timed.forEach((c, i) => {
+      const next = i + 1 < timed.length ? timed[i + 1].start : Math.min(S.DUR, c.start + 4);
+      S.lineCaps.push({ start: c.start, end: Math.max(c.start + 0.8, next), text: c.text });
+    });
+    if (plain.length) {
+      const t0 = S.hook ? 2.4 : 0.4;
+      const pool = inRange.filter(b => b.t >= t0 && b.s > 0.35);
+      const use = pool.length >= plain.length ? pool : inRange.filter(b => b.t >= t0);
+      const starts = []; let lastStart = -10;
+      for (const b of use) { if (b.t - lastStart >= 2.4) { starts.push(b.t); lastStart = b.t; } }
+      plain.forEach((text, i) => {
+        const start = i < starts.length ? starts[i] : t0 + i * 3;
+        const end = (i + 1 < plain.length && i + 1 < starts.length) ? starts[i + 1] : Math.min(S.DUR, start + 3.2);
+        if (start < S.DUR) S.lineCaps.push({ start, end, text });
+      });
+      S.lineCaps.sort((a, b) => a.start - b.start);
+    }
+    /* parts strip */
+    const strip = el("parts"); strip.innerHTML = "";
+    const COL = ["#ffd23e", "#7ee0a3", "#6ec3ff", "#ff9de2"];
+    S.segments.forEach((sg, i) => {
+      const d = document.createElement("span");
+      d.style.width = Math.max(4, (sg.end - sg.start) / S.DUR * 100) + "%";
+      d.style.background = COL[sg.clipIdx % COL.length];
+      d.title = (sg.start.toFixed(1) + "s");
+      strip.appendChild(d);
+    });
+    S.built = true; el("render").disabled = false;
+    statusEl.textContent = "✅ Song understood: " + beats.length + " beats" + (bpm ? " · ~" + bpm + " BPM" : "") + " · " + Math.round(S.DUR) + "s" +
+      "\nStyle: " + P.label + (S.preset === "auto" ? " (auto-picked)" : "") + " · Mode: " + (mode === "clips" ? S.clipFiles.length + " clip(s)" : mode === "photos" ? S.photoFiles.length + " photo(s)" : "song visual") +
+      "\n" + S.segments.length + " parts ready" + (S.lineCaps.length ? " · " + S.lineCaps.length + " lyric line(s) placed" : "") + " — press RENDER + DOWNLOAD MP4.";
+  } catch (err) { statusEl.textContent = "Build failed: " + (err && err.message ? err.message : err); }
+  el("build").disabled = false;
+});
+
+/* ---------- frame-exact render on the new engine, original style effects ---------- */
+function drawText(ctx, W, H, t) {
+  ctx.save(); ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  if (S.hook && t < 2.2) {
+    const pop = t < 0.25 ? 0.6 + 0.4 * (t / 0.25) : 1;
+    const a = t > 1.9 ? Math.max(0, (2.2 - t) / 0.3) : 1;
+    ctx.globalAlpha = a;
+    ctx.font = "900 " + Math.round(W * 0.128 * pop) + "px system-ui, 'Arial Black', sans-serif";
+    ctx.lineWidth = 12; ctx.strokeStyle = "rgba(0,0,0,0.9)"; ctx.lineJoin = "round";
+    ctx.fillStyle = "rgba(0,0,0,0.38)"; ctx.fillRect(10, H * 0.38 - W * 0.108, W - 20, W * 0.216);
+    ctx.strokeText(S.hook.toUpperCase(), W / 2, H * 0.38);
+    ctx.fillStyle = "#ffd23e"; ctx.fillText(S.hook.toUpperCase(), W / 2, H * 0.38);
+  } else {
+    let cap = null;
+    for (const c of S.lineCaps) { if (t >= c.start && t < c.end) { cap = c; break; } }
+    if (cap) {
+      const fadeIn = Math.min(1, (t - cap.start) / 0.15);
+      const fadeOut = Math.min(1, (cap.end - t) / 0.2);
+      ctx.globalAlpha = Math.max(0, Math.min(fadeIn, fadeOut));
+      const words = cap.text.toUpperCase().split(/\s+/).filter(Boolean);
+      let rows = [words.join(" ")];
+      if (cap.text.length > 24 && words.length > 3) {
+        const half = Math.ceil(words.length / 2);
+        rows = [words.slice(0, half).join(" "), words.slice(half).join(" ")];
+      }
+      let fs = Math.round(W * 0.068);
+      ctx.font = "900 " + fs + "px system-ui, 'Arial Black', sans-serif";
+      let maxW = 0; rows.forEach(r => { maxW = Math.max(maxW, ctx.measureText(r).width); });
+      if (maxW > W - 40) {
+        fs = Math.max(20, Math.floor(fs * (W - 40) / maxW));
+        ctx.font = "900 " + fs + "px system-ui, 'Arial Black', sans-serif";
+        maxW = 0; rows.forEach(r => { maxW = Math.max(maxW, ctx.measureText(r).width); });
+      }
+      const lh = fs * 1.25, cy = H * 0.8;
+      ctx.fillStyle = "rgba(0,0,0,0.42)";
+      ctx.fillRect(Math.max(6, (W - maxW) / 2 - 16), cy - lh * rows.length / 2 - 12, Math.min(W - 12, maxW + 32), lh * rows.length + 24);
+      ctx.lineWidth = 9; ctx.strokeStyle = "rgba(0,0,0,0.92)"; ctx.lineJoin = "round";
+      rows.forEach((r, ri) => {
+        const y = cy + (ri - (rows.length - 1) / 2) * lh;
+        ctx.strokeText(r, W / 2, y);
+        ctx.fillStyle = "#ffffff"; ctx.fillText(r, W / 2, y);
+      });
+    }
+  }
+  ctx.restore();
+}
+
+el("render").addEventListener("click", async () => {
+  if (!S.built) return;
+  el("render").disabled = true; el("build").disabled = true;
+  const [W, H] = el("size").value.split("x").map(Number);
+  const FPS = 30, DUR = S.DUR, P = PRESETS[effPreset()];
+  statusEl.textContent = "Rendering — frame by frame, exactly on the beat…";
+  try {
+    const mode = S.clipFiles.length ? "clips" : (S.photoFiles.length ? "photos" : "visual");
+    /* prepare sources */
+    const clipData = [];
+    if (mode === "clips") {
+      for (const f of S.clipFiles) {
+        const input = new MB.Input({ source: new MB.BlobSource(f), formats: MB.ALL_FORMATS });
+        const track = await input.getPrimaryVideoTrack();
+        clipData.push({ input, sink: new MB.VideoSampleSink(track), dur: await input.computeDuration() });
+      }
+      const curs = S.clipFiles.map(() => 0);
+      for (const sg of S.segments) {
+        const d = clipData[sg.clipIdx].dur;
+        let cur = curs[sg.clipIdx];
+        if (d > 1 && cur > d - 0.6) cur = 0;
+        sg.srcStart = Math.round(cur * 100) / 100;
+        curs[sg.clipIdx] = cur + (sg.end - sg.start) * sg.rate;
+      }
+    }
+    const bitmaps = [];
+    if (mode === "photos") { for (const f of S.photoFiles) bitmaps.push(await createImageBitmap(f)); }
+    const audioCodec = await pickAudioCodec(Math.min(2, S.songBuf.numberOfChannels), 48000);
+    say("Audio encoder: " + (audioCodec ? audioCodec.toUpperCase() : "none (video-only)"));
+    const canvas = new OffscreenCanvas(W, H);
+    const ctx = canvas.getContext("2d");
+    const target = new MB.BufferTarget();
+    const output = new MB.Output({ format: new MB.Mp4OutputFormat(), target });
+    const vSrc = new MB.CanvasSource(canvas, { codec: "avc", bitrate: 8_000_000 });
+    output.addVideoTrack(vSrc);
+    let aSrc = null;
+    if (audioCodec) { aSrc = new MB.AudioBufferSource({ codec: audioCodec, bitrate: 128_000 }); output.addAudioTrack(aSrc); }
+    await output.start();
+    if (aSrc) {
+      const sr = S.songBuf.sampleRate, len = Math.floor(DUR * sr);
+      const sub = new AudioBuffer({ numberOfChannels: S.songBuf.numberOfChannels, length: len, sampleRate: sr });
+      for (let c = 0; c < S.songBuf.numberOfChannels; c++) sub.getChannelData(c).set(S.songBuf.getChannelData(c).subarray(0, len));
+      await aSrc.add(sub);
+    }
+    const totalFrames = Math.floor(DUR * FPS);
+    let frame = 0;
+    const beatEnv = (t) => {
+      let e = 0;
+      for (const b of S.beats) { if (b.t <= t) e = Math.max(e, b.s * Math.exp(-(t - b.t) * 5)); else break; }
+      return e;
+    };
+    for (let si = 0; si < S.segments.length; si++) {
+      const sg = S.segments[si];
+      const segFrames = Math.max(1, Math.round((sg.end - sg.start) * FPS));
+      let iter = null, cur = null, cd = null;
+      if (mode === "clips") {
+        cd = clipData[sg.clipIdx];
+        const srcEnd = Math.min(cd.dur, sg.srcStart + (sg.end - sg.start) * sg.rate + 0.1);
+        iter = cd.sink.samples(sg.srcStart, srcEnd)[Symbol.asyncIterator]();
+        cur = (await iter.next()).value || null;
+      }
+      for (let k = 0; k < segFrames && frame < totalFrames; k++, frame++) {
+        const t = frame / FPS;
+        const age = t - sg.start, segDur = Math.max(0.2, sg.end - sg.start);
+        /* --- the original editor's effects, frame-exact --- */
+        const punch = P.zoomPunch * sg.zAmt * Math.exp(-age * 6.5);
+        const drift = sg.kb * 0.035 * Math.min(1, age / segDur);
+        const z = 1 + drift + punch;
+        let shakeX = 0, shakeY = 0;
+        if (sg.strong > 0.72) {
+          const amp = P.shake * 10 * Math.exp(-age * 13);
+          shakeX = (Math.random() - 0.5) * 2 * amp; shakeY = (Math.random() - 0.5) * 2 * amp;
+        }
+        ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
+        ctx.save();
+        ctx.filter = P.grade;
+        ctx.translate(shakeX, shakeY);
+        if (mode === "clips") {
+          const srcT = sg.srcStart + (t - sg.start) * sg.rate;
+          while (cur && cur.timestamp + cur.duration <= srcT + 0.001) { const nx = (await iter.next()).value || null; cur.close(); cur = nx; }
+          if (cur) {
+            const sw = cur.displayWidth || cur.codedWidth, sh = cur.displayHeight || cur.codedHeight;
+            const scale = Math.max(W / sw, H / sh) * z;
+            const dw = sw * scale, dh = sh * scale;
+            cur.draw(ctx, (W - dw) / 2, (H - dh) / 2, dw, dh);
+          }
+        } else if (mode === "photos") {
+          const bm = bitmaps[sg.clipIdx];
+          const scale = Math.max(W / bm.width, H / bm.height) * z;
+          const dw = bm.width * scale, dh = bm.height * scale;
+          ctx.drawImage(bm, (W - dw) / 2, (H - dh) / 2, dw, dh);
+        } else {
+          /* song-only visual: pulsing glow on the beat over a slow-moving gradient */
+          const e = beatEnv(t);
+          const hue = (t * 8 + 260) % 360;
+          const g = ctx.createRadialGradient(W / 2, H * 0.42, 10, W / 2, H * 0.42, W * (0.45 + 0.35 * e));
+          g.addColorStop(0, "hsla(" + hue + ",85%," + (38 + 22 * e) + "%,1)");
+          g.addColorStop(1, "#0b0d13");
+          ctx.fillStyle = g; ctx.fillRect(-20, -20, W + 40, H + 40);
+          ctx.fillStyle = "rgba(255,255,255," + (0.10 + 0.25 * e) + ")";
+          ctx.beginPath(); ctx.arc(W / 2, H * 0.42, W * 0.16 * (1 + 0.5 * e), 0, Math.PI * 2); ctx.fill();
+          for (let bi = 0; bi < 9; bi++) {
+            const bh = (0.05 + 0.3 * e * Math.abs(Math.sin(t * 2.1 + bi * 1.7))) * H;
+            ctx.fillStyle = "rgba(255,210,62," + (0.25 + 0.5 * e) + ")";
+            ctx.fillRect(W * 0.14 + bi * (W * 0.08), H * 0.78 - bh, W * 0.045, bh);
+          }
+        }
+        ctx.restore();
+        ctx.filter = "none";
+        if (sg.strong > 0.75) { /* beat flash */
+          ctx.fillStyle = "rgba(255,255,255," + (0.20 * Math.exp(-age * 15)).toFixed(3) + ")";
+          ctx.fillRect(0, 0, W, H);
+        }
+        if (si === 0 && t < 0.45) { /* fade in from black */
+          ctx.fillStyle = "rgba(0,0,0," + (1 - t / 0.45).toFixed(3) + ")";
+          ctx.fillRect(0, 0, W, H);
+        }
+        drawText(ctx, W, H, t);
+        await vSrc.add(t, 1 / FPS);
+        if (frame % 90 === 0) statusEl.textContent = "Rendering… " + Math.round(frame / totalFrames * 100) + "% (" + frame + "/" + totalFrames + " frames)";
+      }
+      if (cur) { try { cur.close(); } catch (_) {} }
+    }
+    statusEl.textContent = "Finishing the MP4…";
+    await output.finalize();
+    const blob = new Blob([target.buffer], { type: "video/mp4" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "beatcut-edit.mp4";
+    a.textContent = "⬇ Download your edit (MP4, " + (blob.size / 1048576).toFixed(2) + " MB)";
+    a.style.cssText = "display:inline-block;margin-top:10px;background:#ffd23e;color:#111;font-weight:800;padding:11px 18px;border-radius:9px;text-decoration:none";
+    statusEl.textContent = "✅ RENDER COMPLETE — " + totalFrames + " frames · " + W + "×" + H + " · " + DUR.toFixed(1) + "s. Your edit is ready:";
+    statusEl.appendChild(document.createElement("br"));
+    statusEl.appendChild(a);
+  } catch (err) {
+    say("Render failed: " + (err && err.message ? err.message : err));
+    console.error(err);
+  }
+  el("render").disabled = false; el("build").disabled = false;
+});
+</script>
+</body>
+</html>
