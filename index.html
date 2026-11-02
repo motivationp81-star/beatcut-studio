@@ -110,7 +110,8 @@
   <div class="card cardStyle">
     <h2>3 · Style &amp; effects</h2>
     <div class="chips" id="presets">
-      <button class="chip on" data-preset="funk">🔥 Funk Dhamaaka</button>
+      <button class="chip on" data-preset="auto">🤖 Auto — gaane ke hisaab se</button>
+      <button class="chip" data-preset="funk">🔥 Funk Dhamaaka</button>
       <button class="chip" data-preset="lyrics">👑 Lyrics King</button>
       <button class="chip" data-preset="dreamy">🌹 Dreamy Romantic</button>
       <button class="chip" data-preset="cinematic">🎬 Cinematic</button>
@@ -189,7 +190,7 @@ const W = 720, H = 1280;
 const songEl = $("songEl");
 
 const S = {
-  preset: "funk",
+  preset: "auto",
   clips: [], photos: [], songBuf: null, duration: 0,
   beats: [], segments: [], wordTimes: [], lineTimes: [],
   t0: 0, t1: 0, ready: false, playing: false, exporting: false,
@@ -202,6 +203,15 @@ const PRESETS = {
   dreamy:    { beatsPerCut: 4, shake: 0.15, zoomPunch: 0.03, grade: "brightness(1.05) saturate(1.3)", stickers: "love" },
   cinematic: { beatsPerCut: 4, shake: 0.2, zoomPunch: 0.05, grade: "contrast(1.18) saturate(0.82) brightness(0.96)", stickers: "none" },
 };
+function rng32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function effPreset() {
+  if (S.preset !== "auto") return S.preset;
+  const bpm = S.bpm || 0;
+  if (bpm >= 120) return "funk";
+  if (bpm >= 96) return "lyrics";
+  if (bpm > 0) return "dreamy";
+  return "lyrics";
+}
 const mode = () => S.clips.length ? "clips" : (S.photos.length ? "photos" : "song");
 function setStatus(t) { $("status").textContent = t; }
 
@@ -276,13 +286,15 @@ function analyseBeats() {
   S.beats = beats;
   let bpm = 0;
   if (beats.length > 2) { const gaps = []; for (let i = 1; i < beats.length; i++) gaps.push(beats[i].t - beats[i-1].t); gaps.sort((x, y) => x - y); bpm = Math.round(60 / gaps[Math.floor(gaps.length / 2)]); }
-  $("beatInfo").textContent = "✅ Gaana samajh gaya: " + beats.length + " beats" + (bpm ? " · ~" + bpm + " BPM" : "") + " · " + Math.round(S.duration) + "s";
+  S.bpm = bpm;
+  S.seed = (Math.floor(S.duration * 97) ^ (beats.length * 131) ^ (bpm * 17) ^ (buf.length % 100000)) | 0;
+  $("beatInfo").textContent = "✅ Gaana samajh gaya: " + beats.length + " beats" + (bpm ? " · ~" + bpm + " BPM" : "") + " · " + Math.round(S.duration) + "s" + (S.preset === "auto" ? " · Style khud chuna: " + ({ funk: "🔥 Funk Dhamaaka", lyrics: "👑 Lyrics King", dreamy: "🌹 Dreamy Romantic", cinematic: "🎬 Cinematic" })[effPreset()] : "");
 }
 
 /* ---------------- timeline build ---------------- */
 function buildTimeline() {
   const rate = $("cutRate").value;
-  const P = PRESETS[S.preset];
+  const P = PRESETS[effPreset()];
   const inRange = S.beats.filter(b => b.t >= S.t0 && b.t <= S.t1);
   let cutTimes = [S.t0];
   if (rate === "strong") {
@@ -298,19 +310,27 @@ function buildTimeline() {
     if (cutTimes[i + 1] - cutTimes[i] < 0.12) continue;
     S.segments.push({ start: cutTimes[i], end: cutTimes[i + 1], idx: S.segments.length });
   }
+  const R = rng32(S.seed || 1234);
+  const funky = effPreset() === "funk";
+  S.segments.forEach(sg => {
+    sg.zAmt = 0.6 + R() * 1.1;
+    sg.rate = funky ? [1.3, 1.3, 0.8, 1.5, 1.0][Math.floor(R() * 5)] : [1, 1, 1, 0.85, 1.15][Math.floor(R() * 5)];
+    sg.dir = R() < 0.5 ? -1 : 1;
+    sg.tr = R() < 0.18 ? (R() < 0.5 ? "fade" : "slide") : "none";
+  });
   const lines = $("lyrics").value.split("\n").map(x => x.trim()).filter(Boolean);
   S.wordTimes = []; S.lineTimes = [];
   const tStart = $("hookText").value.trim() ? S.t0 + 2.0 : S.t0;
   const pool = inRange.filter(b => b.t >= tStart && b.s > 0.35); const use = pool.length >= 4 ? pool : inRange.filter(b => b.t >= tStart);
   let bi = 0;
-  lines.forEach(line => {
+  lines.forEach((line, li) => {
     if (bi < use.length) S.lineTimes.push({ line, t: use[bi].t });
-    line.split(/\s+/).filter(Boolean).forEach(w => { if (bi < use.length) { S.wordTimes.push({ word: w, t: use[bi].t }); bi++; } });
+    line.split(/\s+/).filter(Boolean).forEach(w => { if (bi < use.length) { S.wordTimes.push({ word: w, t: use[bi].t, ln: li }); bi++; } });
   });
   S.lastBeatIdx = -1; S.lastSegIdx = -1; S.particles = [];
   drawTimelineStrip();
 }
-function tlSignature() { return $("lyrics").value + "|" + $("hookText").value + "|" + S.t0 + "-" + S.t1 + "|" + $("cutRate").value + "|" + S.preset + "|" + S.beats.length; }
+function tlSignature() { return $("lyrics").value + "|" + $("hookText").value + "|" + S.t0 + "-" + S.t1 + "|" + $("cutRate").value + "|" + S.preset + "|" + S.beats.length + "|" + (S.seed || 0); }
 function ensureTimeline() { const sig = tlSignature(); if (sig !== S.tlSig) { S.tlSig = sig; buildTimeline(); } }
 $("lyrics").addEventListener("input", () => { if (S.songBuf) ensureTimeline(); });
 $("hookText").addEventListener("input", () => { if (S.songBuf) ensureTimeline(); });
@@ -363,7 +383,8 @@ function man() {
 }
 function drawFrame(rawT) {
   const t = Math.min(Math.max(rawT, S.t0), S.t1 || rawT);
-  const P = PRESETS[S.preset];
+  const P = PRESETS[effPreset()];
+  const EP = effPreset();
   const M = man();
   const seg = segAt(t);
   const segP = Math.min(1, (t - seg.start) / Math.max(0.01, seg.end - seg.start));
@@ -389,7 +410,7 @@ function drawFrame(rawT) {
   let f = P.grade + " brightness(" + M.bri + ") contrast(" + M.con + ") saturate(" + M.sat + ")" + (M.blur > 0 ? " blur(" + M.blur + "px)" : "");
   if ($("qEnhance").checked) f += " contrast(1.05) saturate(1.08)";
   try { ctx.filter = f; } catch(_){}
-  const punch = $("fxZoom").checked ? 1 + P.zoomPunch * M.zoom * Math.max(0, 1 - (t - seg.start) * 3.5) : 1;
+  const punch = $("fxZoom").checked ? 1 + P.zoomPunch * M.zoom * (seg.zAmt || 1) * Math.max(0, 1 - (t - seg.start) * 3.5) : 1;
   const m = mode();
 
   if (m === "clips") {
@@ -399,12 +420,12 @@ function drawFrame(rawT) {
         S.lastSegIdx = seg.idx;
         const dur = v.duration || 1;
         try { v.currentTime = (seg.idx * 3.7) % Math.max(1, dur - 0.5); } catch(_){}
-        v.playbackRate = (S.preset === "funk" ? (seg.idx % 3 === 2 ? 0.8 : 1.3) : 1) * (M.spd || 1);
+        v.playbackRate = (seg.rate || 1) * (M.spd || 1);
       }
       if ((S.playing || S.exporting) && v.paused) v.play().catch(() => {});
-      let panX = 0;
-      if (M.tr === "slide") panX = Math.max(0, 1 - segP * 3) * 90 * (seg.idx % 2 ? -1 : 1);
-      if (M.tr === "fade") ctx.globalAlpha = Math.min(1, 0.2 + segP * 3.2);
+      let panX = 0; const trv = M.tr !== "none" ? M.tr : (seg.tr || "none");
+      if (trv === "slide") panX = Math.max(0, 1 - segP * 3) * 90 * (seg.dir || 1);
+      if (trv === "fade") ctx.globalAlpha = Math.min(1, 0.2 + segP * 3.2);
       drawCover(v, v.videoWidth, v.videoHeight, punch * (1 + segP * 0.05), panX);
       ctx.globalAlpha = 1;
     } else {
@@ -444,15 +465,15 @@ function drawFrame(rawT) {
   }
   try { ctx.filter = "none"; } catch(_){}
 
-  const doGlitch = $("fxGlitch").checked && ((S.preset === "funk" && pulse > 0.42) || m === "song");
+  const doGlitch = $("fxGlitch").checked && ((EP === "funk" && pulse > 0.42) || m === "song");
   if (doGlitch) {
     const csx = canvas.width / W, csy = canvas.height / H;
-    const slices = S.preset === "funk" ? 7 : 4;
+    const slices = EP === "funk" ? 7 : 4;
     for (let i = 0; i < slices; i++) {
-      const gy = Math.random() * canvas.height, gh = (8 + Math.random() * 42) * csy, off = ((Math.random() - 0.5) * (S.preset === "funk" ? 64 : 26) * pulse + 8) * csx;
+      const gy = Math.random() * canvas.height, gh = (8 + Math.random() * 42) * csy, off = ((Math.random() - 0.5) * (EP === "funk" ? 64 : 26) * pulse + 8) * csx;
       try { ctx.drawImage(canvas, 0, gy, canvas.width, gh, off, gy, canvas.width, gh); } catch(_){}
     }
-    if (S.preset === "funk") { ctx.fillStyle = "rgba(255,40,70," + (pulse * 0.12) + ")"; ctx.fillRect(0, 0, W, H); }
+    if (EP === "funk") { ctx.fillStyle = "rgba(255,40,70," + (pulse * 0.12) + ")"; ctx.fillRect(0, 0, W, H); }
   }
   if ($("qSharp").checked && m !== "song") {
     ctx.save(); ctx.globalAlpha = 0.16; try { ctx.globalCompositeOperation = "overlay"; ctx.drawImage(canvas, -1.4, -1.4); } catch(_){} ctx.restore();
@@ -533,7 +554,7 @@ function drawText(t) {
     ctx.restore(); return;
   }
   let scale = 1, rot = 0, yOff = 0;
-  if (style === "wordpop") { const k = Math.min(1, age / 0.13); scale = 0.55 + 0.45 * (1 - Math.pow(1 - k, 3)) + Math.max(0, 1 - age * 2.4) * 0.13; }
+  if (style === "wordpop") { if (((wd.ln || 0) + ((S.seed || 0) % 2)) % 2 === 1) { const k = Math.min(1, age / 0.16); scale = 2.3 - 1.3 * (1 - Math.pow(1 - k, 2)); yOff = (1 - k) * -14; } else { const k = Math.min(1, age / 0.13); scale = 0.55 + 0.45 * (1 - Math.pow(1 - k, 3)) + Math.max(0, 1 - age * 2.4) * 0.13; } }
   if (style === "wordrotate") { const k = Math.min(1, age / 0.2); rot = (1 - k) * -0.5; scale = 0.7 + 0.3 * k; yOff = (1 - k) * 34; }
   if (style === "wordslam") { const k = Math.min(1, age / 0.16); scale = 2.3 - 1.3 * (1 - Math.pow(1 - k, 2)); yOff = (1 - k) * -14; }
   const size = fitFont(word, "900", W - 80, 118);
@@ -543,7 +564,7 @@ function drawText(t) {
   ctx.strokeText(word, 0, 0);
   const grad = ctx.createLinearGradient(0, -size / 2, 0, size / 2);
   grad.addColorStop(0, "#ffffff"); grad.addColorStop(0.55, "#ffe259"); grad.addColorStop(1, "#ffa751");
-  ctx.fillStyle = S.preset === "dreamy" ? "#fff" : grad;
+  ctx.fillStyle = effPreset() === "dreamy" ? "#fff" : grad;
   ctx.shadowColor = "rgba(0,0,0,0.45)"; ctx.shadowBlur = 10 * glowF;
   ctx.fillText(word, 0, 0);
   ctx.restore();
