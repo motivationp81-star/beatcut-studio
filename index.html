@@ -36,7 +36,7 @@
     <label>Video clips (1-4) <input type="file" id="clipFiles" accept="video/*" multiple></label>
     <label>Song <input type="file" id="songFile" accept="audio/*"></label>
     <label>Hook text <input type="text" id="hookText" value="O FIRKI WALI"></label>
-    <label>Lyrics — one line per line (can be empty). Timed line: <i>12.5 | word word word</i> places those words at that second.</label>
+    <label>Lyrics — one full line per line (can be empty). Timed line: <i>12.5 | the full lyric line</i> shows that line from that second until the next line.</label>
     <textarea id="lyrics" rows="3" cols="34"></textarea>
     <label>Video size
       <select id="sizeSel">
@@ -349,27 +349,33 @@ el("render").addEventListener("click", async () => {
     /* word timings from beats */
     const hook = el("hookText").value.trim();
     const lines = el("lyrics").value.split("\n").map(x => x.trim()).filter(Boolean);
-    const wordTimes = [];
+    const lineCaps = [];
     {
-      /* timed lines "12.5 | word word" land at their real second (e.g. from speech-to-text);
-         plain lines are spread over the strong beats, as before */
+      /* Lyric LINES as captions (not single words): a timed line "12.5 | full line here"
+         stays on screen from its second until the next line starts; plain lines are
+         placed one per strong-beat window of ~2.4s or more. */
       const timed = [], plain = [];
       lines.forEach(line => {
         const m = line.match(/^\s*(\d+(?:\.\d+)?)\s*\|\s*(.+)$/);
-        if (m) timed.push({ t: parseFloat(m[1]), words: m[2].split(/\s+/).filter(Boolean) });
+        if (m) timed.push({ t: parseFloat(m[1]), text: m[2].trim() });
         else plain.push(line);
       });
       timed.sort((a, b) => a.t - b.t);
       timed.forEach((tl, i) => {
-        const end = i + 1 < timed.length ? timed[i + 1].t : Math.min(DUR, tl.t + 3);
-        const span = Math.max(0.4, end - tl.t);
-        tl.words.forEach((w, wi) => wordTimes.push({ word: w, t: tl.t + span * (wi / Math.max(1, tl.words.length)) }));
+        const end = i + 1 < timed.length ? timed[i + 1].t : Math.min(DUR, tl.t + 5);
+        lineCaps.push({ start: tl.t, end, text: tl.text });
       });
       const t0 = hook ? 1.6 : 0;
       const pool = inRange.filter(b => b.t >= t0 && b.s > 0.3);
-      let bi = 0;
-      plain.forEach(line => line.split(/\s+/).filter(Boolean).forEach(w => { if (bi < pool.length) wordTimes.push({ word: w, t: pool[bi++].t }); }));
-      wordTimes.sort((a, b) => a.t - b.t);
+      const starts = [];
+      let lastStart = -10;
+      for (const b of pool) { if (b.t - lastStart >= 2.4) { starts.push(b.t); lastStart = b.t; } }
+      plain.forEach((text, i) => {
+        const start = i < starts.length ? starts[i] : t0 + i * 3;
+        const end = i + 1 < plain.length && i + 1 < starts.length ? starts[i + 1] : Math.min(DUR, start + 3.2);
+        if (start < DUR) lineCaps.push({ start, end, text });
+      });
+      lineCaps.sort((a, b) => a.start - b.start);
     }
     const clipData = [];
     for (const f of S.clipFiles) {
@@ -433,15 +439,30 @@ el("render").addEventListener("click", async () => {
           ctx.strokeText(hook.toUpperCase(), W / 2, H * 0.4);
           ctx.fillStyle = "#ffd23e"; ctx.fillText(hook.toUpperCase(), W / 2, H * 0.4);
         } else {
-          let wd = null;
-          for (const w of wordTimes) { if (w.t <= t) wd = w; else break; }
-          if (wd && t - wd.t < 0.6) {
-            const age = t - wd.t, sc = age < 0.09 ? 0.6 + 0.4 * (age / 0.09) : 1;
-            ctx.translate(W / 2, H * 0.52); ctx.scale(sc, sc);
-            ctx.font = "900 " + Math.round(W * 0.133) + "px system-ui, 'Arial Black', sans-serif";
-            ctx.lineWidth = 13; ctx.strokeStyle = "rgba(0,0,0,0.92)"; ctx.lineJoin = "round";
-            ctx.strokeText(wd.word.toUpperCase(), 0, 0);
-            ctx.fillStyle = "#ffffff"; ctx.fillText(wd.word.toUpperCase(), 0, 0);
+          /* full lyric line caption, lower third, fades in/out at the edges */
+          let cap = null;
+          for (const c of lineCaps) { if (t >= c.start && t < c.end) { cap = c; break; } }
+          if (cap) {
+            const fadeIn = Math.min(1, (t - cap.start) / 0.15);
+            const fadeOut = Math.min(1, (cap.end - t) / 0.2);
+            ctx.globalAlpha = Math.max(0, Math.min(fadeIn, fadeOut));
+            const words = cap.text.toUpperCase().split(/\s+/).filter(Boolean);
+            let rows = [words.join(" ")];
+            if (cap.text.length > 24 && words.length > 3) {
+              const half = Math.ceil(words.length / 2);
+              rows = [words.slice(0, half).join(" "), words.slice(half).join(" ")];
+            }
+            const fs = Math.round(W * 0.068), lh = fs * 1.25, cy = H * 0.8;
+            ctx.font = "900 " + fs + "px system-ui, 'Arial Black', sans-serif";
+            let maxW = 0; rows.forEach(r => { maxW = Math.max(maxW, ctx.measureText(r).width); });
+            ctx.fillStyle = "rgba(0,0,0,0.42)";
+            ctx.fillRect(Math.max(6, (W - maxW) / 2 - 16), cy - lh * rows.length / 2 - 12, Math.min(W - 12, maxW + 32), lh * rows.length + 24);
+            ctx.lineWidth = 9; ctx.strokeStyle = "rgba(0,0,0,0.92)"; ctx.lineJoin = "round";
+            rows.forEach((r, ri) => {
+              const y = cy + (ri - (rows.length - 1) / 2) * lh;
+              ctx.strokeText(r, W / 2, y);
+              ctx.fillStyle = "#ffffff"; ctx.fillText(r, W / 2, y);
+            });
           }
         }
         ctx.restore();
