@@ -1,5 +1,7 @@
 # BeatCut Studio
 
+**v2 — rebuilt CapCut-style:** big preview up top, one-tap **Auto Edit**, a visual timeline with beat ticks, song trim sliders, cut-speed control, hook text, and MP4 export where the browser supports it.
+
 Edit video **on the beat of your song** — right in your browser. Add your clips and an audio file, and BeatCut listens to the song, finds its beats, and cuts, shakes and flashes exactly on them. No uploads, no server, no editing timeline to learn.
 
 **▶ Try it live:** https://motivationp81-star.github.io/beatcut-studio/

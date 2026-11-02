@@ -3,128 +3,141 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BeatCut Studio — edit video on the beat of your song</title>
+<title>BeatCut Studio — CapCut-style beat editor</title>
 <style>
-  * { box-sizing: border-box; }
-  body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: #0c0e14; color: #e8eaf2; }
-  .wrap { max-width: 1060px; margin: 0 auto; padding: 22px 16px 48px; }
-  h1 { font-size: 27px; margin: 0 0 4px; } h1 .b { color: #ff4d5e; }
-  .tag { color: #9aa3b8; margin: 0 0 20px; font-size: 14.5px; }
-  .layout { display: flex; gap: 22px; flex-wrap: wrap; align-items: flex-start; }
-  .panel { flex: 1 1 430px; background: #141824; border: 1px solid #232a3d; border-radius: 14px; padding: 18px; }
-  .stage { flex: 0 1 360px; background: #141824; border: 1px solid #232a3d; border-radius: 14px; padding: 18px; text-align: center; }
-  h2 { font-size: 15.5px; margin: 18px 0 9px; color: #cfd6ea; } h2:first-child { margin-top: 0; }
-  .tabs { display: flex; gap: 8px; flex-wrap: wrap; }
-  .tab { flex: 1; min-width: 100px; padding: 10px 6px; border-radius: 10px; border: 1px solid #2c3550; background: #0f1320; color: #aeb7cf; cursor: pointer; font-size: 13.5px; font-weight: 600; }
-  .tab.on { background: #ff4d5e; border-color: #ff4d5e; color: #fff; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: #0b0d13; color: #eef1f8; }
+  .wrap { max-width: 560px; margin: 0 auto; padding: 14px 12px 60px; }
+  header { text-align: center; padding: 8px 0 12px; }
+  h1 { font-size: 24px; margin: 0; } h1 .b { color: #ff4d5e; }
+  .tag { color: #98a2ba; font-size: 13.5px; margin: 5px 0 0; }
+  .stageCard { background: #131826; border: 1px solid #232b42; border-radius: 16px; padding: 12px; position: sticky; top: 8px; z-index: 5; }
+  canvas#stage { width: 100%; max-width: 330px; aspect-ratio: 9/16; display: block; margin: 0 auto; background: #000; border-radius: 12px; }
+  .transport { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+  #btnPlay { flex: 0 0 auto; width: 52px; height: 52px; border-radius: 50%; border: none; background: #ff4d5e; color: #fff; font-size: 21px; cursor: pointer; }
+  #btnPlay:disabled { background: #39415c; }
+  #timeLabel { font-size: 13px; color: #aeb7cf; font-variant-numeric: tabular-nums; }
+  #beatInfo { font-size: 13px; color: #8fd18a; margin-top: 8px; min-height: 17px; text-align: center; }
+  #status { font-size: 13px; color: #9aa3b8; margin-top: 3px; min-height: 17px; text-align: center; }
+  .card { background: #131826; border: 1px solid #232b42; border-radius: 16px; padding: 15px; margin-top: 14px; }
+  .card h2 { font-size: 15px; margin: 0 0 10px; color: #d5dbee; }
   label.f { display: block; font-size: 13px; color: #9aa3b8; margin: 10px 0 5px; }
-  input[type=file] { width: 100%; background: #0f1320; border: 1px dashed #33405f; border-radius: 9px; padding: 9px; color: #c7cede; font-size: 13px; }
+  input[type=file] { width: 100%; background: #0e1220; border: 1px dashed #33405f; border-radius: 10px; padding: 10px; color: #c7cede; font-size: 13px; }
   .chips { display: flex; gap: 7px; flex-wrap: wrap; }
-  .chip { padding: 8px 12px; border-radius: 999px; border: 1px solid #2c3550; background: #0f1320; color: #aeb7cf; cursor: pointer; font-size: 13px; font-weight: 600; }
+  .chip { padding: 9px 13px; border-radius: 999px; border: 1px solid #2c3550; background: #0e1220; color: #aeb7cf; cursor: pointer; font-size: 13.5px; font-weight: 600; }
   .chip.on { background: #31406e; border-color: #5b7bd5; color: #fff; }
-  .checks { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; font-size: 13.5px; }
+  .checks { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; font-size: 13.5px; }
   .checks label { display: flex; gap: 7px; align-items: center; cursor: pointer; color: #c7cede; }
-  textarea, select, input[type=text] { width: 100%; background: #0f1320; border: 1px solid #2c3550; border-radius: 9px; color: #e8eaf2; padding: 9px 10px; font-size: 13.5px; font-family: inherit; }
-  textarea { min-height: 84px; resize: vertical; }
-  canvas { width: 100%; max-width: 324px; aspect-ratio: 9/16; background: #000; border-radius: 12px; border: 1px solid #232a3d; }
-  .row { display: flex; gap: 9px; flex-wrap: wrap; margin-top: 12px; justify-content: center; }
-  button.act { padding: 11px 18px; border: none; border-radius: 10px; font-size: 14.5px; font-weight: 700; cursor: pointer; background: #232c47; color: #e8eaf2; }
-  button.act:disabled { opacity: .45; cursor: default; }
-  #btnExport { background: #ff4d5e; color: #fff; }
-  #beatInfo { font-size: 13px; color: #8fd18a; min-height: 18px; margin-top: 9px; }
-  #status { font-size: 13px; color: #9aa3b8; min-height: 18px; margin-top: 5px; }
-  .hint { font-size: 12.5px; color: #78829c; margin-top: 5px; }
-  footer { color: #5d6580; font-size: 12.5px; text-align: center; margin-top: 26px; }
+  textarea, select, input[type=text] { width: 100%; background: #0e1220; border: 1px solid #2c3550; border-radius: 10px; color: #eef1f8; padding: 10px; font-size: 14px; font-family: inherit; }
+  textarea { min-height: 78px; resize: vertical; }
+  input[type=range] { width: 100%; accent-color: #ff4d5e; }
+  .rangeRow { display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: #9aa3b8; }
+  .rangeRow output { min-width: 40px; text-align: right; color: #d5dbee; font-variant-numeric: tabular-nums; }
+  #timeline { width: 100%; height: 46px; background: #0e1220; border: 1px solid #232b42; border-radius: 10px; display: block; }
+  .hint { font-size: 12.5px; color: #78829c; margin-top: 6px; }
+  #btnAuto { width: 100%; padding: 14px; border: none; border-radius: 12px; background: #31406e; color: #fff; font-size: 16px; font-weight: 800; cursor: pointer; margin-top: 14px; }
+  #btnAuto:disabled { opacity: .45; }
+  #btnExport { width: 100%; padding: 16px; border: none; border-radius: 12px; background: #ff4d5e; color: #fff; font-size: 17px; font-weight: 800; cursor: pointer; margin-top: 14px; }
+  #btnExport:disabled { opacity: .45; }
+  footer { color: #5d6580; font-size: 12.5px; text-align: center; margin-top: 22px; }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>🎬 BeatCut <span class="b">Studio</span></h1>
-  <p class="tag">Give it your clips and your song — it cuts, shakes and flashes <b>exactly on the beat</b>. Funk edits, lyric videos, photo collages and song-only visualizers, all in your browser. Nothing is uploaded.</p>
+  <header>
+    <h1>🎬 BeatCut <span class="b">Studio</span></h1>
+    <p class="tag">CapCut-style editor that cuts <b>on the beat of your song</b>. Add media, tap Auto Edit, export. Everything stays on your device.</p>
+  </header>
 
-  <div class="layout">
-    <div class="panel">
-      <h2>1 · Mode</h2>
-      <div class="tabs">
-        <button class="tab on" data-mode="clips">🎞️ Clips + Song</button>
-        <button class="tab" data-mode="song">🎵 Song Only</button>
-        <button class="tab" data-mode="photos">🖼️ Photos + Song</button>
-      </div>
-
-      <div id="mediaClips">
-        <label class="f">Your video clips (one or more)</label>
-        <input type="file" id="fileClips" accept="video/*" multiple>
-      </div>
-      <div id="mediaPhotos" style="display:none">
-        <label class="f">Your photos (two or more look best)</label>
-        <input type="file" id="filePhotos" accept="image/*" multiple>
-      </div>
-      <div id="mediaBg" style="display:none">
-        <label class="f">Background image for the visualizer (optional)</label>
-        <input type="file" id="fileBg" accept="image/*">
-      </div>
-      <label class="f">Your song (audio file — required, this drives the whole edit)</label>
-      <input type="file" id="fileSong" accept="audio/*">
-      <div id="beatInfo"></div>
-
-      <h2>2 · Style preset</h2>
-      <div class="chips" id="presets">
-        <button class="chip on" data-preset="funk">🔥 Funk Dhamaaka</button>
-        <button class="chip" data-preset="lyrics">👑 Lyrics King</button>
-        <button class="chip" data-preset="dreamy">🌹 Dreamy Romantic</button>
-        <button class="chip" data-preset="cinematic">🎬 Cinematic</button>
-      </div>
-
-      <h2>3 · Effects</h2>
-      <div class="checks">
-        <label><input type="checkbox" id="fxGlitch" checked> Glitch on the drop</label>
-        <label><input type="checkbox" id="fxShake" checked> Beat shake</label>
-        <label><input type="checkbox" id="fxFlash"> White flash on strong beats</label>
-        <label><input type="checkbox" id="fxZoom" checked> Zoom punch on cuts</label>
-        <label><input type="checkbox" id="fxStickers"> Sparkle / heart stickers</label>
-        <label><input type="checkbox" id="fxVignette" checked> Vignette</label>
-      </div>
-
-      <h2>4 · Quality pack</h2>
-      <div class="checks">
-        <label><input type="checkbox" id="qEnhance" checked> Colour clean + contrast</label>
-        <label><input type="checkbox" id="qSharp" checked> Sharpen</label>
-      </div>
-      <label class="f">Export size</label>
-      <select id="qSize">
-        <option value="720">720 × 1280 (fast)</option>
-        <option value="1080">1080 × 1920 (HD, slower)</option>
-      </select>
-
-      <h2>5 · Lyrics / text</h2>
-      <textarea id="lyrics" placeholder="Type your lyric lines here, one line per line. Hinglish works too.
-Example:
-udi udi jaaye
-dil ki patang dekho
-udi udi jaaye"></textarea>
-      <label class="f">Text style</label>
-      <select id="textStyle">
-        <option value="wordpop">Word by word — big pop (funk)</option>
-        <option value="wordcards">Word cards — red on black</option>
-        <option value="wordrotate">Word by word — rotate in</option>
-        <option value="linefade">Line by line — soft fade</option>
-      </select>
-      <label class="f">Watermark (optional, small corner text)</label>
-      <input type="text" id="watermark" placeholder="e.g. your channel name">
+  <div class="stageCard">
+    <canvas id="stage" width="720" height="1280"></canvas>
+    <div class="transport">
+      <button id="btnPlay" disabled title="Play / pause">▶</button>
+      <span id="timeLabel">0.0s / 0.0s</span>
     </div>
-
-    <div class="stage">
-      <canvas id="stage" width="720" height="1280"></canvas>
-      <div class="row">
-        <button class="act" id="btnPlay" disabled>▶ Preview</button>
-        <button class="act" id="btnExport" disabled>⬇ Export video</button>
-      </div>
-      <div id="status">Add your media and a song to begin.</div>
-      <p class="hint">Export renders in real time (a 30-second song takes about 30 seconds) and downloads a .webm video with the song in it.</p>
-    </div>
+    <div id="beatInfo"></div>
+    <div id="status">Pehle neeche apni clip/photo aur gaana add karo 👇</div>
   </div>
 
-  <footer>BeatCut Studio — your files never leave your device. Made for creators who edit on the beat.</footer>
+  <div class="card">
+    <h2>1 · Media add karo</h2>
+    <label class="f">Video clips (ek ya zyada) — ya khali chhodo photo mode ke liye</label>
+    <input type="file" id="fileClips" accept="video/*" multiple>
+    <label class="f">Photos (clip nahi hai to ye use honge)</label>
+    <input type="file" id="filePhotos" accept="image/*" multiple>
+    <label class="f">Gaana (song) — yahi pure edit ko chalata hai 🎵</label>
+    <input type="file" id="fileSong" accept="audio/*">
+  </div>
+
+  <button id="btnAuto" disabled>⚡ AUTO EDIT — beat par kaato</button>
+
+  <div class="card">
+    <h2>2 · Timeline &amp; trim</h2>
+    <canvas id="timeline" width="720" height="46"></canvas>
+    <p class="hint">Upar wali patti = tumhara edit. Chhoti lakeerein = beat, bade hisse = cuts.</p>
+    <div class="rangeRow"><span>Shuru</span><input type="range" id="trimStart" min="0" max="100" value="0" step="0.1"><output id="trimStartVal">0.0s</output></div>
+    <div class="rangeRow"><span>Aakhir</span><input type="range" id="trimEnd" min="0" max="100" value="100" step="0.1"><output id="trimEndVal">0.0s</output></div>
+    <label class="f">Cut ki speed</label>
+    <select id="cutRate">
+      <option value="auto">Auto (style ke hisaab se)</option>
+      <option value="1">Har beat par cut (sabse tez)</option>
+      <option value="2">Har 2 beat par</option>
+      <option value="4">Har 4 beat par (shaant)</option>
+      <option value="strong">Sirf strong beat / drop par</option>
+    </select>
+  </div>
+
+  <div class="card">
+    <h2>3 · Style &amp; effects</h2>
+    <div class="chips" id="presets">
+      <button class="chip on" data-preset="funk">🔥 Funk Dhamaaka</button>
+      <button class="chip" data-preset="lyrics">👑 Lyrics King</button>
+      <button class="chip" data-preset="dreamy">🌹 Dreamy Romantic</button>
+      <button class="chip" data-preset="cinematic">🎬 Cinematic</button>
+    </div>
+    <div class="checks" style="margin-top:12px">
+      <label><input type="checkbox" id="fxGlitch" checked> Drop par glitch</label>
+      <label><input type="checkbox" id="fxShake" checked> Beat shake</label>
+      <label><input type="checkbox" id="fxFlash"> Strong beat par flash</label>
+      <label><input type="checkbox" id="fxZoom" checked> Cut par zoom punch</label>
+      <label><input type="checkbox" id="fxStickers"> Sparkle / dil stickers</label>
+      <label><input type="checkbox" id="fxVignette" checked> Vignette</label>
+    </div>
+    <label class="f">Quality</label>
+    <div class="checks">
+      <label><input type="checkbox" id="qEnhance" checked> Rang saaf + contrast</label>
+      <label><input type="checkbox" id="qSharp" checked> Sharpen</label>
+    </div>
+    <label class="f">Export size</label>
+    <select id="qSize">
+      <option value="720">720 × 1280 (tez)</option>
+      <option value="1080">1080 × 1920 HD (dheema)</option>
+    </select>
+  </div>
+
+  <div class="card">
+    <h2>4 · Text / lyrics</h2>
+    <label class="f">Shuruaat ka bada text (hook) — khali bhi chalega</label>
+    <input type="text" id="hookText" placeholder="e.g. LADDO RANI 🔥">
+    <label class="f">Lyrics — ek line per line (Hinglish chalega)</label>
+    <textarea id="lyrics" placeholder="udi udi jaaye
+dil ki patang dekho
+udi udi jaaye"></textarea>
+    <label class="f">Text ka andaaz</label>
+    <select id="textStyle">
+      <option value="wordpop">Shabd-dar-shabd — bada pop (funk)</option>
+      <option value="wordcards">Word cards — laal akshar, kaala parda</option>
+      <option value="wordrotate">Shabd-dar-shabd — ghoom kar entry</option>
+      <option value="linefade">Line-dar-line — naram fade</option>
+    </select>
+    <label class="f">Chhota naam kone me (watermark, chaaho to)</label>
+    <input type="text" id="watermark" placeholder="e.g. apne channel ka naam">
+  </div>
+
+  <button id="btnExport" disabled>⬇ VIDEO EXPORT KARO</button>
+  <p class="hint" style="text-align:center">Export utna hi time lega jitna lamba gaana hai (real-time render). MP4 mile to MP4, nahi to WebM download hoga.</p>
+
+  <footer>BeatCut Studio v2 — tumhari files device se bahar nahi jaati.</footer>
 </div>
 <audio id="songEl" preload="auto" style="display:none"></audio>
 <script>
@@ -132,90 +145,82 @@ udi udi jaaye"></textarea>
 const $ = id => document.getElementById(id);
 const canvas = $("stage"), ctx = canvas.getContext("2d");
 const W = 720, H = 1280;
+const songEl = $("songEl");
 
 const S = {
-  mode: "clips", preset: "funk",
-  clips: [],        // {el: HTMLVideoElement}
-  photos: [],       // {img: HTMLImageElement}
-  bg: null,         // visualizer background image
-  songURL: null, songBuf: null, duration: 0,
-  beats: [],        // {t, s} s = strength 0..1
-  segments: [],     // {start, end, idx}
-  wordTimes: [],    // {word, t, line}
-  lineTimes: [],    // {line, t}
-  ready: false, playing: false, exporting: false,
-  particles: [], lastBeatIdx: -1, cutFlash: 0, shakeAmp: 0,
+  preset: "funk",
+  clips: [], photos: [], songBuf: null, duration: 0,
+  beats: [], segments: [], wordTimes: [], lineTimes: [],
+  t0: 0, t1: 0, ready: false, playing: false, exporting: false,
+  particles: [], lastBeatIdx: -1, lastSegIdx: -1, flash: 0, shakeAmp: 0,
+  errShown: false, audioGraph: null,
 };
-
 const PRESETS = {
-  funk:      { beatsPerCut: 1, glitch: true,  shake: 1.0, zoomPunch: 0.16, grade: "contrast(1.12) saturate(1.25)", stickerSet: "spark" },
-  lyrics:    { beatsPerCut: 2, glitch: false, shake: 0.4, zoomPunch: 0.08, grade: "contrast(1.06) saturate(1.15)", stickerSet: "spark" },
-  dreamy:    { beatsPerCut: 4, glitch: false, shake: 0.15, zoomPunch: 0.03, grade: "brightness(1.05) saturate(1.3)", stickerSet: "love" },
-  cinematic: { beatsPerCut: 4, glitch: false, shake: 0.2, zoomPunch: 0.05, grade: "contrast(1.18) saturate(0.82) brightness(0.96)", stickerSet: "none" },
+  funk:      { beatsPerCut: 1, shake: 1.0, zoomPunch: 0.16, grade: "contrast(1.12) saturate(1.25)", stickers: "spark" },
+  lyrics:    { beatsPerCut: 2, shake: 0.4, zoomPunch: 0.08, grade: "contrast(1.06) saturate(1.15)", stickers: "spark" },
+  dreamy:    { beatsPerCut: 4, shake: 0.15, zoomPunch: 0.03, grade: "brightness(1.05) saturate(1.3)", stickers: "love" },
+  cinematic: { beatsPerCut: 4, shake: 0.2, zoomPunch: 0.05, grade: "contrast(1.18) saturate(0.82) brightness(0.96)", stickers: "none" },
 };
-
+const mode = () => S.clips.length ? "clips" : (S.photos.length ? "photos" : "song");
 function setStatus(t) { $("status").textContent = t; }
 
-/* ---------- media loading ---------- */
+/* ---------------- media ---------------- */
 $("fileClips").addEventListener("change", e => {
-  S.clips.forEach(c => { try { c.el.pause(); } catch(_){} URL.revokeObjectURL(c.el.src); });
+  S.clips.forEach(c => { try { c.el.pause(); } catch(_){} });
   S.clips = [...e.target.files].map(f => {
     const el = document.createElement("video");
     el.src = URL.createObjectURL(f); el.muted = true; el.loop = true; el.playsInline = true; el.preload = "auto";
+    el.addEventListener("loadeddata", () => { if (S.ready) drawFrame(previewT()); });
     return { el };
   });
-  setStatus(S.clips.length + " clip(s) loaded."); maybeReady();
+  if (S.clips.length) setStatus(S.clips.length + " clip(s) add ho gayi ✅ Ab gaana add karo (ya Auto Edit dabao).");
+  refreshReady();
 });
 $("filePhotos").addEventListener("change", e => {
   S.photos = [];
   [...e.target.files].forEach(f => {
     const img = new Image();
-    img.onload = () => { S.photos.push({ img }); maybeReady(); };
+    img.onload = () => { S.photos.push({ img }); refreshReady(); if (S.ready) drawFrame(previewT()); };
     img.src = URL.createObjectURL(f);
   });
-  setStatus("Photos loading…");
-});
-$("fileBg").addEventListener("change", e => {
-  const f = e.target.files[0]; if (!f) { S.bg = null; return; }
-  const img = new Image(); img.onload = () => { S.bg = img; };
-  img.src = URL.createObjectURL(f);
+  if (e.target.files.length) setStatus("Photos load ho rahi hain…");
 });
 $("fileSong").addEventListener("change", async e => {
   const f = e.target.files[0]; if (!f) return;
-  if (S.songURL) URL.revokeObjectURL(S.songURL);
-  S.songURL = URL.createObjectURL(f);
-  $("songEl").src = S.songURL;
-  setStatus("Listening to your song… finding the beats 🎧");
+  songEl.src = URL.createObjectURL(f);
+  setStatus("Gaana sun raha hu… beat dhoond raha hu 🎧");
+  let buf;
   try {
-    const buf = await f.arrayBuffer();
+    const raw = await f.arrayBuffer();
     const AC = window.AudioContext || window.webkitAudioContext;
     const ac = new AC();
-    S.songBuf = await ac.decodeAudioData(buf);
-    await ac.close();
-    S.duration = S.songBuf.duration;
-    analyseBeats();
-    maybeReady();
-  } catch (err) { setStatus("Could not read that song file — try another audio file."); }
+    buf = await ac.decodeAudioData(raw);
+    try { await ac.close(); } catch(_){}
+  } catch (err) {
+    setStatus("❌ Ye gaana file padh nahi paya — koi dusri audio file (mp3) try karo.");
+    return;
+  }
+  S.songBuf = buf; S.duration = buf.duration; S.t0 = 0; S.t1 = buf.duration;
+  $("trimStart").max = buf.duration; $("trimEnd").max = buf.duration;
+  $("trimStart").value = 0; $("trimEnd").value = buf.duration;
+  $("trimStartVal").textContent = "0.0s"; $("trimEndVal").textContent = buf.duration.toFixed(1) + "s";
+  try { analyseBeats(); } catch (err) { setStatus("❌ Beat analysis me dikkat aayi — dusra gaana try karo."); return; }
+  refreshReady();
 });
 
-/* ---------- beat analysis ---------- */
+/* ---------------- beat engine (tested) ---------------- */
 function analyseBeats() {
   const buf = S.songBuf, sr = buf.sampleRate, ch = buf.numberOfChannels;
   const data = new Float32Array(buf.length);
   for (let c = 0; c < ch; c++) { const d = buf.getChannelData(c); for (let i = 0; i < d.length; i++) data[i] += d[i] / ch; }
-  // one-pole lowpass to emphasise the beat (kick/bass)
   const lp = new Float32Array(data.length); let prev = 0; const a = 0.12;
   for (let i = 0; i < data.length; i++) { prev = prev + a * (data[i] - prev); lp[i] = prev; }
-  // energy envelope, 512-sample hop
   const hop = 512, win = 2048, n = Math.floor((lp.length - win) / hop);
   const env = new Float32Array(n);
   for (let k = 0; k < n; k++) { let s = 0; const off = k * hop; for (let i = 0; i < win; i += 4) { const v = lp[off + i]; s += v * v; } env[k] = s; }
-  // spectral-flux style onset: rising energy
   const flux = new Float32Array(n);
   for (let k = 1; k < n; k++) flux[k] = Math.max(0, env[k] - env[k - 1]);
-  // adaptive threshold peak picking
-  const beats = [], hopSec = hop / sr;
-  const W2 = 40; let lastT = -1;
+  const beats = [], hopSec = hop / sr, W2 = 40; let lastT = -1;
   for (let k = 2; k < n - 2; k++) {
     if (flux[k] <= 0 || flux[k] < flux[k - 1] || flux[k] < flux[k + 1]) continue;
     let mean = 0, cnt = 0;
@@ -226,142 +231,143 @@ function analyseBeats() {
   }
   let max = 0; beats.forEach(b => { if (b.s > max) max = b.s; });
   beats.forEach(b => { b.s = max ? Math.pow(b.s / max, 0.7) : 0; });
-  if (beats.length < 4) { // fallback: steady grid from energy
-    const step = 0.5; for (let t = 0.25; t < S.duration; t += step) beats.push({ t, s: 0.5 });
-  }
+  if (beats.length < 4) { for (let t = 0.25; t < S.duration; t += 0.5) beats.push({ t, s: 0.5 }); }
   S.beats = beats;
-  // average gap -> rough BPM
   let bpm = 0;
-  if (beats.length > 2) { const gaps = []; for (let i = 1; i < beats.length; i++) gaps.push(beats[i].t - beats[i-1].t); gaps.sort((x, y) => x - y); const med = gaps[Math.floor(gaps.length / 2)]; bpm = Math.round(60 / med); }
-  $("beatInfo").textContent = "✅ Song analysed: " + beats.length + " beats found" + (bpm ? " · ~" + bpm + " BPM" : "") + " · " + Math.round(S.duration) + "s long. The edit will follow these beats.";
-  buildTimeline();
+  if (beats.length > 2) { const gaps = []; for (let i = 1; i < beats.length; i++) gaps.push(beats[i].t - beats[i-1].t); gaps.sort((x, y) => x - y); bpm = Math.round(60 / gaps[Math.floor(gaps.length / 2)]); }
+  $("beatInfo").textContent = "✅ Gaana samajh gaya: " + beats.length + " beats" + (bpm ? " · ~" + bpm + " BPM" : "") + " · " + Math.round(S.duration) + "s";
 }
 
-/* ---------- timeline: segments + lyric timing ---------- */
+/* ---------------- timeline build ---------------- */
 function buildTimeline() {
+  const rate = $("cutRate").value;
   const P = PRESETS[S.preset];
-  const cuts = [0];
-  for (let i = 0; i < S.beats.length; i += P.beatsPerCut) cuts.push(S.beats[i].t);
-  cuts.push(S.duration);
-  const uniq = [...new Set(cuts.map(x => Math.round(x * 100) / 100))].sort((a, b) => a - b);
-  S.segments = [];
-  for (let i = 0; i < uniq.length - 1; i++) {
-    if (uniq[i + 1] - uniq[i] < 0.12) continue;
-    S.segments.push({ start: uniq[i], end: uniq[i + 1], idx: S.segments.length });
+  const inRange = S.beats.filter(b => b.t >= S.t0 && b.t <= S.t1);
+  let cutTimes = [S.t0];
+  if (rate === "strong") {
+    inRange.filter(b => b.s > 0.62).forEach(b => cutTimes.push(b.t));
+  } else {
+    const step = rate === "auto" ? P.beatsPerCut : parseInt(rate, 10);
+    for (let i = 0; i < inRange.length; i += step) cutTimes.push(inRange[i].t);
   }
-  // lyrics timing
+  cutTimes.push(S.t1);
+  cutTimes = [...new Set(cutTimes.map(x => Math.round(x * 100) / 100))].sort((a, b) => a - b);
+  S.segments = [];
+  for (let i = 0; i < cutTimes.length - 1; i++) {
+    if (cutTimes[i + 1] - cutTimes[i] < 0.12) continue;
+    S.segments.push({ start: cutTimes[i], end: cutTimes[i + 1], idx: S.segments.length });
+  }
   const lines = $("lyrics").value.split("\n").map(x => x.trim()).filter(Boolean);
   S.wordTimes = []; S.lineTimes = [];
-  const strong = S.beats.filter(b => b.s > 0.35);
-  const pool = strong.length >= 4 ? strong : S.beats;
+  const pool = inRange.filter(b => b.s > 0.35); const use = pool.length >= 4 ? pool : inRange;
   let bi = 0;
-  lines.forEach((line, li) => {
-    const words = line.split(/\s+/).filter(Boolean);
-    if (bi < pool.length) S.lineTimes.push({ line, t: pool[bi].t });
-    words.forEach(w => { if (bi < pool.length) { S.wordTimes.push({ word: w, t: pool[bi].t, line: li }); bi++; } });
+  lines.forEach(line => {
+    if (bi < use.length) S.lineTimes.push({ line, t: use[bi].t });
+    line.split(/\s+/).filter(Boolean).forEach(w => { if (bi < use.length) { S.wordTimes.push({ word: w, t: use[bi].t }); bi++; } });
   });
-  S.lastBeatIdx = -1; S.particles = [];
+  S.lastBeatIdx = -1; S.lastSegIdx = -1; S.particles = [];
+  drawTimelineStrip();
+}
+function drawTimelineStrip() {
+  const c = $("timeline"), g = c.getContext("2d");
+  const tw = c.width, th = c.height, span = Math.max(0.01, S.t1 - S.t0);
+  g.fillStyle = "#0e1220"; g.fillRect(0, 0, tw, th);
+  if (!S.segments.length) return;
+  S.segments.forEach((sg, i) => {
+    const x = (sg.start - S.t0) / span * tw, wdt = Math.max(2, (sg.end - sg.start) / span * tw - 2);
+    g.fillStyle = i % 2 ? "#2c3a63" : "#3b4f8a";
+    g.fillRect(x, 8, wdt, th - 16);
+  });
+  g.fillStyle = "rgba(255,255,255,0.55)";
+  S.beats.forEach(b => { if (b.t < S.t0 || b.t > S.t1) return; const x = (b.t - S.t0) / span * tw; g.fillRect(x, th - 7, 1.4, 5); });
+  // playhead
+  const px = (previewT() - S.t0) / span * tw;
+  g.fillStyle = "#ff4d5e"; g.fillRect(px - 1, 0, 2.4, th);
+}
+function previewT() { return songEl.currentTime || S.t0; }
+function refreshReady() {
+  S.ready = !!S.songBuf && (S.clips.length > 0 || S.photos.length > 0 || true);
+  const has = !!S.songBuf;
+  $("btnPlay").disabled = !has; $("btnExport").disabled = !has; $("btnAuto").disabled = !has;
+  if (has) { buildTimeline(); setStatus("Taiyaar ✅ Play dabakar dekho, ya seedha Export karo."); drawFrame(previewT()); }
 }
 
-function maybeReady() {
-  const hasMedia = S.mode === "clips" ? S.clips.length > 0 : S.mode === "photos" ? S.photos.length > 0 : !!S.songBuf;
-  S.ready = hasMedia && !!S.songBuf;
-  $("btnPlay").disabled = !S.ready; $("btnExport").disabled = !S.ready;
-  if (S.ready) { buildTimeline(); setStatus("Ready ✅ Press Preview, or Export to make the video."); drawFrame(0); }
-}
-
-/* ---------- drawing ---------- */
-function drawCover(src, sw, sh, zoom, panX, panY) {
+/* ---------------- drawing ---------------- */
+function drawCover(src, sw, sh, zoom, panX) {
+  if (!sw || !sh) return;
   const scale = Math.max(W / sw, H / sh) * zoom;
   const dw = sw * scale, dh = sh * scale;
-  ctx.drawImage(src, (W - dw) / 2 + panX, (H - dh) / 2 + panY, dw, dh);
+  ctx.drawImage(src, (W - dw) / 2 + panX, (H - dh) / 2, dw, dh);
 }
 function segAt(t) {
-  const segs = S.segments; if (!segs.length) return null;
-  let lo = 0, hi = segs.length - 1, ans = segs[0];
-  while (lo <= hi) { const m = (lo + hi) >> 1; if (segs[m].start <= t) { ans = segs[m]; lo = m + 1; } else hi = m - 1; }
+  const segs = S.segments; if (!segs.length) return { start: S.t0, end: S.t1, idx: 0 };
+  let ans = segs[0];
+  for (const sg of segs) { if (sg.start <= t) ans = sg; else break; }
   return ans;
 }
-function beatNear(t) { // latest beat at or before t + its index
-  let idx = -1;
-  for (let i = 0; i < S.beats.length; i++) { if (S.beats[i].t <= t) idx = i; else break; }
-  return idx;
-}
-function gradeFilter() {
-  let f = PRESETS[S.preset].grade;
-  if ($("qEnhance").checked) f += " contrast(1.05) saturate(1.08)";
-  return f;
-}
+function beatNear(t) { let idx = -1; for (let i = 0; i < S.beats.length; i++) { if (S.beats[i].t <= t) idx = i; else break; } return idx; }
 function spawnParticles(n, set) {
   const glyphs = set === "love" ? ["❤️", "🌸", "✨", "⭐"] : ["✨", "⭐", "💥"];
-  for (let i = 0; i < n; i++) {
-    S.particles.push({ x: Math.random() * W, y: H * 0.25 + Math.random() * H * 0.6, vy: -(30 + Math.random() * 70), vx: (Math.random() - 0.5) * 30, life: 1, g: glyphs[(Math.random() * glyphs.length) | 0], size: 22 + Math.random() * 30 });
-  }
+  for (let i = 0; i < n; i++) S.particles.push({ x: Math.random() * W, y: H * 0.25 + Math.random() * H * 0.6, vy: -(30 + Math.random() * 70), vx: (Math.random() - 0.5) * 30, life: 1, g: glyphs[(Math.random() * glyphs.length) | 0], size: 22 + Math.random() * 30 });
 }
 
-function drawFrame(t) {
+function drawFrame(rawT) {
+  const t = Math.min(Math.max(rawT, S.t0), S.t1 || rawT);
   const P = PRESETS[S.preset];
-  const seg = segAt(t) || { start: 0, end: Math.max(S.duration, 1), idx: 0 };
+  const seg = segAt(t);
   const segP = Math.min(1, (t - seg.start) / Math.max(0.01, seg.end - seg.start));
   const bIdx = beatNear(t);
   const beat = bIdx >= 0 ? S.beats[bIdx] : null;
-  const sinceBeat = beat ? t - beat.t : 9;
-  const pulse = beat ? Math.max(0, 1 - sinceBeat * 3.2) * beat.s : 0;
+  const pulse = beat ? Math.max(0, 1 - (t - beat.t) * 3.2) * beat.s : 0;
 
-  // reactive triggers on a fresh beat / cut
   if (bIdx !== S.lastBeatIdx) {
     S.lastBeatIdx = bIdx;
     if (beat && beat.s > 0.55) {
-      if ($("fxFlash").checked) S.cutFlash = Math.max(S.cutFlash, beat.s * 0.85);
-      if ($("fxStickers").checked && P.stickerSet !== "none") spawnParticles(beat.s > 0.8 ? 6 : 3, P.stickerSet);
+      if ($("fxFlash").checked) S.flash = Math.max(S.flash, beat.s * 0.85);
+      if ($("fxStickers").checked && P.stickers !== "none") spawnParticles(beat.s > 0.8 ? 6 : 3, P.stickers);
     }
     if (beat) S.shakeAmp = Math.max(S.shakeAmp, beat.s * 10 * P.shake * ($("fxShake").checked ? 1 : 0));
   }
-  S.cutFlash *= 0.82; S.shakeAmp *= 0.8;
+  S.flash *= 0.82; S.shakeAmp *= 0.8;
   const shX = (Math.random() - 0.5) * 2 * S.shakeAmp, shY = (Math.random() - 0.5) * 2 * S.shakeAmp;
 
   ctx.save();
   ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
   ctx.translate(shX, shY);
-  ctx.filter = gradeFilter();
+  let f = P.grade; if ($("qEnhance").checked) f += " contrast(1.05) saturate(1.08)";
+  try { ctx.filter = f; } catch(_){}
+  const punch = $("fxZoom").checked ? 1 + P.zoomPunch * Math.max(0, 1 - (t - seg.start) * 3.5) : 1;
+  const m = mode();
 
-  const cutAge = t - seg.start;
-  const punch = $("fxZoom").checked ? 1 + P.zoomPunch * Math.max(0, 1 - cutAge * 3.5) : 1;
-
-  if (S.mode === "clips" && S.clips.length) {
-    const c = S.clips[seg.idx % S.clips.length];
-    const v = c.el;
-    if (v.readyState >= 2) {
-      const dur = v.duration || 1;
+  if (m === "clips") {
+    const v = S.clips[seg.idx % S.clips.length].el;
+    if (v.readyState >= 2 && v.videoWidth) {
       if (S.lastSegIdx !== seg.idx) {
         S.lastSegIdx = seg.idx;
-        const off = (seg.idx * 3.7) % Math.max(1, dur - 0.5);
-        try { v.currentTime = off; } catch(_){}
-        v.playbackRate = S.preset === "funk" ? (seg.idx % 3 === 2 ? 0.8 : 1.3) : 1; // phonk speed-ramp feel
+        const dur = v.duration || 1;
+        try { v.currentTime = (seg.idx * 3.7) % Math.max(1, dur - 0.5); } catch(_){}
+        v.playbackRate = S.preset === "funk" ? (seg.idx % 3 === 2 ? 0.8 : 1.3) : 1;
       }
       if ((S.playing || S.exporting) && v.paused) v.play().catch(() => {});
-      drawCover(v, v.videoWidth || 720, v.videoHeight || 1280, punch * (1 + segP * 0.05), 0, 0);
+      drawCover(v, v.videoWidth, v.videoHeight, punch * (1 + segP * 0.05), 0);
+    } else {
+      ctx.fillStyle = "#1a2036"; ctx.fillRect(0, 0, W, H);
     }
-  } else if (S.mode === "photos" && S.photos.length) {
+  } else if (m === "photos") {
     const cur = S.photos[seg.idx % S.photos.length].img;
-    const zoom = 1.05 + segP * 0.13;
-    const panX = (seg.idx % 2 ? -1 : 1) * segP * 26;
-    drawCover(cur, cur.naturalWidth, cur.naturalHeight, zoom * punch, panX, 0);
-    if (segP > 0.86 && S.photos.length > 1) { // soft blend into next photo
+    drawCover(cur, cur.naturalWidth, cur.naturalHeight, (1.05 + segP * 0.13) * punch, (seg.idx % 2 ? -1 : 1) * segP * 26);
+    if (segP > 0.86 && S.photos.length > 1) {
       const nx = S.photos[(seg.idx + 1) % S.photos.length].img;
       ctx.globalAlpha = (segP - 0.86) / 0.14 * 0.9;
-      drawCover(nx, nx.naturalWidth, nx.naturalHeight, 1.05, 0, 0);
+      drawCover(nx, nx.naturalWidth, nx.naturalHeight, 1.05, 0);
       ctx.globalAlpha = 1;
     }
   } else {
-    // song-only visualizer: beat-reactive dream background
     const g = ctx.createRadialGradient(W/2, H*0.42, 60, W/2, H*0.5, H*0.75);
     const hue = 265 + Math.sin(t * 0.14) * 35;
     g.addColorStop(0, "hsl(" + hue + ",75%," + (26 + pulse * 22) + "%)");
     g.addColorStop(1, "#05060e");
     ctx.fillStyle = g; ctx.fillRect(-30, -30, W + 60, H + 60);
-    if (S.bg) { ctx.globalAlpha = 0.85; drawCover(S.bg, S.bg.naturalWidth, S.bg.naturalHeight, 1.04 + pulse * 0.1, 0, 0); ctx.globalAlpha = 1; }
-    // glow orb + rings that breathe with the beat
     ctx.save(); ctx.globalCompositeOperation = "lighter";
     const orbR = 120 + pulse * 90;
     const og = ctx.createRadialGradient(W/2, H*0.42, 8, W/2, H*0.42, orbR * 2.2);
@@ -371,7 +377,6 @@ function drawFrame(t) {
     ctx.strokeStyle = "hsla(" + hue + ",90%,75%," + (0.35 + pulse * 0.5) + ")"; ctx.lineWidth = 3;
     for (let r = 0; r < 3; r++) { ctx.beginPath(); ctx.arc(W/2, H*0.42, orbR + r * 46 + Math.sin(t * 2 + r) * 5, 0, 7); ctx.stroke(); }
     ctx.restore();
-    // drifting stars
     ctx.fillStyle = "rgba(255,255,255,0.85)";
     for (let i = 0; i < 42; i++) {
       const sx = (i * 173.3 + t * (6 + (i % 5) * 3)) % W, sy = (i * 311.7 + Math.sin(t * 0.6 + i) * 14) % H;
@@ -380,38 +385,27 @@ function drawFrame(t) {
     }
     ctx.globalAlpha = 1;
   }
-  ctx.filter = "none";
+  try { ctx.filter = "none"; } catch(_){}
 
-  // glitch slices on strong beats (funk) / gentle pulses (dreamy visualizer)
-  const doGlitch = $("fxGlitch").checked && ((S.preset === "funk" && pulse > 0.42) || S.mode === "song");
+  const doGlitch = $("fxGlitch").checked && ((S.preset === "funk" && pulse > 0.42) || m === "song");
   if (doGlitch) {
     const csx = canvas.width / W, csy = canvas.height / H;
     const slices = S.preset === "funk" ? 7 : 4;
     for (let i = 0; i < slices; i++) {
       const gy = Math.random() * canvas.height, gh = (8 + Math.random() * 42) * csy, off = ((Math.random() - 0.5) * (S.preset === "funk" ? 64 : 26) * pulse + 8) * csx;
-      ctx.drawImage(canvas, 0, gy, canvas.width, gh, off, gy, canvas.width, gh);
+      try { ctx.drawImage(canvas, 0, gy, canvas.width, gh, off, gy, canvas.width, gh); } catch(_){}
     }
     if (S.preset === "funk") { ctx.fillStyle = "rgba(255,40,70," + (pulse * 0.12) + ")"; ctx.fillRect(0, 0, W, H); }
   }
-
-  // sharpen approximation: faint offset overlay
-  if ($("qSharp").checked && S.mode !== "song") {
-    ctx.save(); ctx.globalAlpha = 0.16; ctx.globalCompositeOperation = "overlay";
-    ctx.drawImage(canvas, -1.4, -1.4); ctx.restore();
+  if ($("qSharp").checked && m !== "song") {
+    ctx.save(); ctx.globalAlpha = 0.16; try { ctx.globalCompositeOperation = "overlay"; ctx.drawImage(canvas, -1.4, -1.4); } catch(_){} ctx.restore();
   }
-
-  // stickers / particles
   S.particles = S.particles.filter(p => p.life > 0);
-  S.particles.forEach(p => {
-    p.life -= 0.016; p.y += p.vy * 0.016; p.x += p.vx * 0.016;
-    ctx.save(); ctx.globalAlpha = Math.max(0, p.life); ctx.font = p.size + "px serif"; ctx.fillText(p.g, p.x, p.y); ctx.restore();
-  });
-
-  // flash
-  if (S.cutFlash > 0.02) { ctx.fillStyle = "rgba(255,255,255," + Math.min(0.9, S.cutFlash) + ")"; ctx.fillRect(-30, -30, W + 60, H + 60); }
+  S.particles.forEach(p => { p.life -= 0.016; p.y += p.vy * 0.016; p.x += p.vx * 0.016; ctx.save(); ctx.globalAlpha = Math.max(0, p.life); ctx.font = p.size + "px serif"; ctx.fillText(p.g, p.x, p.y); ctx.restore(); });
+  if (S.flash > 0.02) { ctx.fillStyle = "rgba(255,255,255," + Math.min(0.9, S.flash) + ")"; ctx.fillRect(-30, -30, W + 60, H + 60); }
   ctx.restore();
 
-  drawLyrics(t);
+  drawText(t);
   if ($("fxVignette").checked) {
     const vg = ctx.createRadialGradient(W/2, H/2, H*0.32, W/2, H/2, H*0.72);
     vg.addColorStop(0, "rgba(0,0,0,0)"); vg.addColorStop(1, "rgba(0,0,0,0.5)");
@@ -421,63 +415,60 @@ function drawFrame(t) {
   if (wm) { ctx.save(); ctx.font = "600 24px system-ui"; ctx.fillStyle = "rgba(255,255,255,0.75)"; ctx.textAlign = "right"; ctx.fillText(wm, W - 22, H - 26); ctx.restore(); }
 }
 
-/* ---------- lyrics rendering ---------- */
-function currentWord(t) {
-  let cur = null;
-  for (const w of S.wordTimes) { if (w.t <= t) cur = w; else break; }
-  if (!cur) return null;
-  const next = S.wordTimes[S.wordTimes.indexOf(cur) + 1];
-  return { ...cur, end: next ? next.t : cur.t + 0.6 };
-}
-function currentLine(t) {
-  let cur = null;
-  for (const l of S.lineTimes) { if (l.t <= t) cur = l; else break; }
-  if (!cur) return null;
-  const next = S.lineTimes[S.lineTimes.indexOf(cur) + 1];
-  return { ...cur, end: next ? next.t : cur.t + 2.4 };
-}
+/* ---------------- text ---------------- */
 function fitFont(text, weight, maxW, start) {
   let s = start;
   ctx.font = weight + " " + s + "px system-ui, 'Arial Black', sans-serif";
-  while (ctx.measureText(text).width > maxW && s > 26) { s -= 6; ctx.font = weight + " " + s + "px system-ui, 'Arial Black', sans-serif"; }
+  while (ctx.measureText(text).width > maxW && s > 24) { s -= 6; ctx.font = weight + " " + s + "px system-ui, 'Arial Black', sans-serif"; }
   return s;
 }
-function drawLyrics(t) {
+function wrapText(text, x, y, maxW, lh) {
+  const words = text.split(/\s+/); const lines = []; let cur = "";
+  words.forEach(w => { const t2 = cur ? cur + " " + w : w; if (ctx.measureText(t2).width > maxW && cur) { lines.push(cur); cur = w; } else cur = t2; });
+  if (cur) lines.push(cur);
+  lines.forEach((ln, i) => ctx.fillText(ln, x, y + (i - (lines.length - 1) / 2) * lh));
+}
+function currentOf(list, t, defEnd) {
+  let cur = null;
+  for (const it of list) { if (it.t <= t) cur = it; else break; }
+  if (!cur) return null;
+  const next = list[list.indexOf(cur) + 1];
+  return { ...cur, end: next ? next.t : cur.t + defEnd };
+}
+function drawText(t) {
   const style = $("textStyle").value;
   ctx.save(); ctx.textAlign = "center"; ctx.textBaseline = "middle";
-  // opening title card: the first lyric line, big, for the first 1.5 seconds
-  if (S.lineTimes.length && t < 1.5 && style !== "wordcards") {
-    const a = t < 0.2 ? t / 0.2 : (t > 1.15 ? Math.max(0, (1.5 - t) / 0.35) : 1);
+  const hook = $("hookText").value.trim();
+  const rel = t - S.t0;
+  if (hook && rel < 2.0) {
+    const a = rel < 0.2 ? rel / 0.2 : (rel > 1.6 ? Math.max(0, (2.0 - rel) / 0.4) : 1);
     ctx.globalAlpha = a;
-    fitFont(S.lineTimes[0].line, "800", W - 80, 66);
-    ctx.shadowColor = "rgba(0,0,0,0.7)"; ctx.shadowBlur = 18;
-    ctx.fillStyle = "#fff";
-    wrapText(S.lineTimes[0].line, W / 2, H * 0.46, W - 80, 74);
+    const sc = 0.7 + 0.3 * Math.min(1, rel / 0.18);
+    ctx.translate(W / 2, H * 0.4); ctx.scale(sc, sc);
+    const size = fitFont(hook.toUpperCase(), "900", W - 70, 104);
+    ctx.font = "900 " + size + "px system-ui, 'Arial Black', sans-serif";
+    ctx.lineWidth = Math.max(6, size / 9); ctx.strokeStyle = "rgba(0,0,0,0.9)"; ctx.lineJoin = "round";
+    ctx.strokeText(hook.toUpperCase(), 0, 0);
+    ctx.fillStyle = "#ffd23e"; ctx.fillText(hook.toUpperCase(), 0, 0);
     ctx.restore(); return;
   }
   if (style === "linefade") {
-    const L = currentLine(t); if (!L) { ctx.restore(); return; }
+    const L = currentOf(S.lineTimes, t, 2.4); if (!L) { ctx.restore(); return; }
     const age = t - L.t, life = L.end - L.t;
-    const a = Math.min(1, age / 0.25) * (life - age < 0.4 ? Math.max(0, (life - age) / 0.4) : 1);
-    ctx.globalAlpha = Math.max(0, a);
+    ctx.globalAlpha = Math.max(0, Math.min(1, age / 0.25) * (life - age < 0.4 ? Math.max(0, (life - age) / 0.4) : 1));
     fitFont(L.line, "700", W - 90, 54);
-    ctx.shadowColor = "rgba(0,0,0,0.65)"; ctx.shadowBlur = 16;
-    ctx.fillStyle = "#fff";
+    ctx.shadowColor = "rgba(0,0,0,0.65)"; ctx.shadowBlur = 16; ctx.fillStyle = "#fff";
     wrapText(L.line, W / 2, H * 0.8, W - 90, 62);
     ctx.restore(); return;
   }
-  const wd = currentWord(t); if (!wd) { ctx.restore(); return; }
-  const age = t - wd.t;
-  const word = wd.word.toUpperCase();
+  const wd = currentOf(S.wordTimes, t, 0.6); if (!wd) { ctx.restore(); return; }
+  const age = t - wd.t, word = wd.word.toUpperCase();
   if (style === "wordcards") {
-    // red word on black card, alternating with the picture (Mercedes style)
     if (age < 0.42) {
       ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
       fitFont(word, "700", W - 70, 120);
       ctx.font = ctx.font.replace("system-ui", "Georgia, 'Times New Roman', serif");
-      ctx.fillStyle = "#ff2020";
-      if (age < 0.1 && $("fxGlitch").checked) { ctx.fillStyle = "#ff6060"; ctx.fillText(word, W/2 + 4, H/2); ctx.fillStyle = "#ff2020"; }
-      ctx.fillText(word, W / 2, H / 2);
+      ctx.fillStyle = "#ff2020"; ctx.fillText(word, W / 2, H / 2);
     }
     ctx.restore(); return;
   }
@@ -496,43 +487,63 @@ function drawLyrics(t) {
   ctx.fillText(word, 0, 0);
   ctx.restore();
 }
-function wrapText(text, x, y, maxW, lh) {
-  const words = text.split(/\s+/); const lines = []; let cur = "";
-  words.forEach(w => { const t2 = cur ? cur + " " + w : w; if (ctx.measureText(t2).width > maxW && cur) { lines.push(cur); cur = w; } else cur = t2; });
-  if (cur) lines.push(cur);
-  lines.forEach((ln, i) => ctx.fillText(ln, x, y + (i - (lines.length - 1) / 2) * lh));
-}
+const _drawFrameInner = drawFrame;
+drawFrame = function (t) {
+  const sx = canvas.width / W, sy = canvas.height / H;
+  ctx.setTransform(sx, 0, 0, sy, 0, 0);
+  _drawFrameInner(t);
+  ctx.setTransform(1, 0, 0, 1);
+};
 
-/* ---------- playback ---------- */
-const songEl = $("songEl");
+/* ---------------- playback (robust loop) ---------------- */
 let rafId = null;
 function loop() {
   if (!S.playing && !S.exporting) return;
-  drawFrame(songEl.currentTime);
-  rafId = requestAnimationFrame(loop);
+  rafId = requestAnimationFrame(loop); // schedule first: one bad frame can never freeze the edit
+  try {
+    drawFrame(songEl.currentTime);
+    const ct = songEl.currentTime;
+    $("timeLabel").textContent = Math.max(0, ct - S.t0).toFixed(1) + "s / " + (S.t1 - S.t0).toFixed(1) + "s";
+    drawTimelineStrip();
+    if (ct >= S.t1 - 0.03 && !S.exporting) stopPlay();
+  } catch (err) {
+    if (!S.errShown) { S.errShown = true; setStatus("⚠️ Preview me ek frame par dikkat aayi — dobara Play dabao. (" + (err && err.message ? err.message : "error") + ")"); }
+  }
+}
+function stopPlay() {
+  S.playing = false; songEl.pause(); S.clips.forEach(c => { try { c.el.pause(); } catch(_){} });
+  $("btnPlay").textContent = "▶"; if (rafId) cancelAnimationFrame(rafId);
 }
 $("btnPlay").addEventListener("click", async () => {
-  if (!S.ready) return;
-  if (S.playing) {
-    S.playing = false; songEl.pause(); S.clips.forEach(c => c.el.pause());
-    $("btnPlay").textContent = "▶ Preview"; cancelAnimationFrame(rafId); return;
-  }
-  buildTimeline();
-  S.playing = true; $("btnPlay").textContent = "⏸ Pause";
-  try { await songEl.play(); } catch (_) {}
+  if (!S.songBuf) return;
+  if (S.playing) { stopPlay(); return; }
+  if (songEl.currentTime < S.t0 || songEl.currentTime >= S.t1 - 0.05) { try { songEl.currentTime = S.t0; } catch(_){} }
+  S.playing = true; S.errShown = false; $("btnPlay").textContent = "⏸";
+  try { await songEl.play(); } catch(_){}
   loop();
 });
-songEl.addEventListener("ended", () => {
-  if (S.exporting) return;
-  S.playing = false; $("btnPlay").textContent = "▶ Preview"; S.clips.forEach(c => c.el.pause());
+songEl.addEventListener("ended", () => { if (!S.exporting) stopPlay(); });
+
+/* ---------------- auto edit ---------------- */
+$("btnAuto").addEventListener("click", () => {
+  if (!S.songBuf) return;
+  buildTimeline();
+  setStatus("⚡ Auto Edit taiyaar — " + S.segments.length + " cuts beat par lag gaye. Play dabakar dekho!");
+  window.scrollTo({ top: 0, behavior: "smooth" });
+  if (!S.playing) $("btnPlay").click();
 });
 
-/* ---------- export ---------- */
+/* ---------------- export ---------------- */
+function pickMime() {
+  const cands = ["video/mp4;codecs=avc1.42E01E,mp4a.40.2", "video/mp4", "video/webm;codecs=vp9,opus", "video/webm"];
+  for (const c of cands) { try { if (window.MediaRecorder && MediaRecorder.isTypeSupported(c)) return c; } catch(_){} }
+  return "";
+}
 $("btnExport").addEventListener("click", async () => {
-  if (!S.ready || S.exporting) return;
+  if (!S.songBuf || S.exporting) return;
+  stopPlay();
   const size = parseInt($("qSize").value, 10);
   canvas.width = size; canvas.height = Math.round(size * 16 / 9);
-  setStatus("Setting up the export…");
   let streamDest = null;
   try {
     if (!S.audioGraph) {
@@ -543,63 +554,66 @@ $("btnExport").addEventListener("click", async () => {
       S.audioGraph = { actx, dest };
     }
     streamDest = S.audioGraph.dest;
-    if (S.audioGraph.actx.state === "suspended") S.audioGraph.actx.resume();
+    if (S.audioGraph.actx.state === "suspended") await S.audioGraph.actx.resume();
   } catch (e) { streamDest = null; }
-  const canvasStream = canvas.captureStream(30);
-  const tracks = [...canvasStream.getVideoTracks()];
+  const tracks = [...canvas.captureStream(30).getVideoTracks()];
   if (streamDest) tracks.push(...streamDest.stream.getAudioTracks());
-  const mixed = new MediaStream(tracks);
+  const mime = pickMime();
   let rec;
-  try { rec = new MediaRecorder(mixed, { mimeType: "video/webm;codecs=vp9,opus", videoBitsPerSecond: 8_000_000 }); }
-  catch (e) { rec = new MediaRecorder(mixed, { videoBitsPerSecond: 8_000_000 }); }
+  try { rec = new MediaRecorder(new MediaStream(tracks), mime ? { mimeType: mime, videoBitsPerSecond: 8_000_000 } : { videoBitsPerSecond: 8_000_000 }); }
+  catch (e) { setStatus("❌ Is browser me video export support nahi hai — Chrome me try karo."); canvas.width = W; canvas.height = H; return; }
   const chunks = [];
   rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
   rec.onstop = () => {
-    const blob = new Blob(chunks, { type: "video/webm" });
+    const isMp4 = (rec.mimeType || "").includes("mp4");
+    const blob = new Blob(chunks, { type: isMp4 ? "video/mp4" : "video/webm" });
     const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob); a.download = "beatcut-video.webm"; a.click();
+    a.href = URL.createObjectURL(blob); a.download = "beatcut-video." + (isMp4 ? "mp4" : "webm"); a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 4000);
     S.exporting = false; $("btnExport").disabled = false; $("btnPlay").disabled = false;
-    canvas.width = W; canvas.height = H;
-    setStatus("Done ✅ Your beat-cut video has downloaded. Drop it straight into Instagram or YouTube.");
+    canvas.width = W; canvas.height = H; buildTimeline(); drawFrame(previewT());
+    setStatus("✅ Ho gaya! Video download ho gaya (" + (isMp4 ? "MP4" : "WebM") + ") — Instagram/YouTube par daal do.");
   };
   buildTimeline();
   S.exporting = true; $("btnExport").disabled = true; $("btnPlay").disabled = true;
-  songEl.currentTime = 0;
-  setStatus("Rendering your video in real time… keep this tab open 🎬");
+  try { songEl.currentTime = S.t0; } catch(_){}
+  setStatus("🎬 Video ban raha hai… tab khula rakho, gaana pura chalega.");
   rec.start(250);
-  try { await songEl.play(); } catch (_) {}
+  try { await songEl.play(); } catch(_){}
   loop();
-  songEl.onended = () => setTimeout(() => { if (rec.state !== "inactive") rec.stop(); S.clips.forEach(c => c.el.pause()); }, 350);
+  const watcher = setInterval(() => {
+    if (!S.exporting) { clearInterval(watcher); return; }
+    if (songEl.currentTime >= S.t1 - 0.03 || songEl.ended) {
+      clearInterval(watcher);
+      setTimeout(() => { if (rec.state !== "inactive") rec.stop(); S.clips.forEach(c => { try { c.el.pause(); } catch(_){} }); }, 300);
+    }
+  }, 200);
 });
 
-/* drawing wrapper: scale layout maths (720x1280) to the live canvas size (HD export) */
-const _drawFrame = drawFrame;
-drawFrame = function (t) {
-  const sx = canvas.width / W, sy = canvas.height / H;
-  ctx.setTransform(sx, 0, 0, sy, 0, 0);
-  _drawFrame(t);
-  ctx.setTransform(1, 0, 0, 1);
-};
-
-/* ---------- UI wiring ---------- */
-document.querySelectorAll(".tab").forEach(b => b.addEventListener("click", () => {
-  document.querySelectorAll(".tab").forEach(x => x.classList.remove("on"));
-  b.classList.add("on"); S.mode = b.dataset.mode;
-  $("mediaClips").style.display = S.mode === "clips" ? "" : "none";
-  $("mediaPhotos").style.display = S.mode === "photos" ? "" : "none";
-  $("mediaBg").style.display = S.mode === "song" ? "" : "none";
-  maybeReady();
-}));
+/* ---------------- wiring ---------------- */
 document.querySelectorAll("#presets .chip").forEach(b => b.addEventListener("click", () => {
   document.querySelectorAll("#presets .chip").forEach(x => x.classList.remove("on"));
   b.classList.add("on"); S.preset = b.dataset.preset;
-  if (S.ready) { buildTimeline(); if (!S.playing) drawFrame(songEl.currentTime || 0); }
+  if (S.songBuf) { buildTimeline(); if (!S.playing) drawFrame(previewT()); }
 }));
-$("lyrics").addEventListener("change", () => { if (S.ready) buildTimeline(); });
-["fxGlitch","fxShake","fxFlash","fxZoom","fxStickers","fxVignette","qEnhance","qSharp","textStyle","watermark"].forEach(id =>
-  $(id).addEventListener("change", () => { if (S.ready && !S.playing) drawFrame(songEl.currentTime || 0); }));
-drawFrame(0);
+$("cutRate").addEventListener("change", () => { if (S.songBuf) { buildTimeline(); } });
+function onTrim() {
+  let a = parseFloat($("trimStart").value), b = parseFloat($("trimEnd").value);
+  if (b - a < 1) { if (event && event.target === $("trimStart")) a = b - 1; else b = a + 1; }
+  S.t0 = Math.max(0, a); S.t1 = Math.min(S.duration || b, b);
+  $("trimStartVal").textContent = S.t0.toFixed(1) + "s"; $("trimEndVal").textContent = S.t1.toFixed(1) + "s";
+  if (S.songBuf) buildTimeline();
+}
+$("trimStart").addEventListener("input", onTrim);
+$("trimEnd").addEventListener("input", onTrim);
+$("lyrics").addEventListener("change", () => { if (S.songBuf) buildTimeline(); });
+["fxGlitch","fxShake","fxFlash","fxZoom","fxStickers","fxVignette","qEnhance","qSharp","textStyle","hookText","watermark"].forEach(id =>
+  $(id).addEventListener("change", () => { if (S.songBuf && !S.playing) drawFrame(previewT()); }));
+ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
+ctx.fillStyle = "#3d4666"; ctx.font = "700 44px system-ui"; ctx.textAlign = "center";
+ctx.fillText("🎬 BeatCut Studio", W / 2, H / 2 - 20);
+ctx.font = "400 30px system-ui"; ctx.fillStyle = "#8a93ad";
+ctx.fillText("Neeche clip + gaana add karo", W / 2, H / 2 + 30);
 </script>
 </body>
 </html>
