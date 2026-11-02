@@ -43,8 +43,21 @@ document.getElementById("go").addEventListener("click", async () => {
     status("Clip track OK: " + vTrack.displayWidth + "x" + vTrack.displayHeight);
 
     status("Decoding song…");
-    const actx = new AudioContext();
+    const actx = new AudioContext({ sampleRate: 48000 });
     const songBufFull = await actx.decodeAudioData(await songF.arrayBuffer());
+
+    async function pickAudioCodec(ch, sr) {
+      const tries = [["aac", "mp4a.40.2"], ["opus", "opus"]];
+      for (const [name, full] of tries) {
+        try {
+          const sup = await AudioEncoder.isConfigSupported({ codec: full, sampleRate: sr, numberOfChannels: ch, bitrate: 128000 });
+          if (sup.supported) return name;
+        } catch (e) { /* try next */ }
+      }
+      return null;
+    }
+    const audioCodec = await pickAudioCodec(Math.min(2, songBufFull.numberOfChannels), 48000);
+    status("Audio encoder: " + (audioCodec ? audioCodec.toUpperCase() : "NONE supported in this browser — video-only proof"));
     const sr = songBufFull.sampleRate, len = Math.min(songBufFull.length, Math.floor(DUR * sr));
     const songBuf = actx.createBuffer(songBufFull.numberOfChannels, len, sr);
     for (let c = 0; c < songBufFull.numberOfChannels; c++)
@@ -56,11 +69,14 @@ document.getElementById("go").addEventListener("click", async () => {
     const target = new MB.BufferTarget();
     const output = new MB.Output({ format: new MB.Mp4OutputFormat(), target });
     const vSrc = new MB.CanvasSource(canvas, { codec: "avc", bitrate: 8_000_000 });
-    const aSrc = new MB.AudioBufferSource({ codec: "aac", bitrate: 128_000 });
     output.addVideoTrack(vSrc);
-    output.addAudioTrack(aSrc);
+    let aSrc = null;
+    if (audioCodec) {
+      aSrc = new MB.AudioBufferSource({ codec: audioCodec, bitrate: 128_000 });
+      output.addAudioTrack(aSrc);
+    }
     await output.start();
-    await aSrc.add(songBuf);
+    if (aSrc) await aSrc.add(songBuf);
     status("Rendering frames…");
 
     const total = DUR * FPS;
