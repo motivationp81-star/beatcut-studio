@@ -491,8 +491,7 @@ const _drawFrameInner = drawFrame;
 drawFrame = function (t) {
   const sx = canvas.width / W, sy = canvas.height / H;
   ctx.setTransform(sx, 0, 0, sy, 0, 0);
-  _drawFrameInner(t);
-  ctx.setTransform(1, 0, 0, 1);
+  try { _drawFrameInner(t); } finally { ctx.setTransform(1, 0, 0, 1, 0, 0); }
 };
 
 /* ---------------- playback (robust loop) ---------------- */
@@ -500,15 +499,13 @@ let rafId = null;
 function loop() {
   if (!S.playing && !S.exporting) return;
   rafId = requestAnimationFrame(loop); // schedule first: one bad frame can never freeze the edit
-  try {
-    drawFrame(songEl.currentTime);
-    const ct = songEl.currentTime;
-    $("timeLabel").textContent = Math.max(0, ct - S.t0).toFixed(1) + "s / " + (S.t1 - S.t0).toFixed(1) + "s";
-    drawTimelineStrip();
-    if (ct >= S.t1 - 0.03 && !S.exporting) stopPlay();
-  } catch (err) {
+  try { drawFrame(songEl.currentTime); } catch (err) {
     if (!S.errShown) { S.errShown = true; setStatus("⚠️ Preview me ek frame par dikkat aayi — dobara Play dabao. (" + (err && err.message ? err.message : "error") + ")"); }
   }
+  const ct = songEl.currentTime;
+  $("timeLabel").textContent = Math.max(0, ct - S.t0).toFixed(1) + "s / " + (S.t1 - S.t0).toFixed(1) + "s";
+  try { drawTimelineStrip(); } catch (_) {}
+  if (ct >= S.t1 - 0.03 && !S.exporting) stopPlay();
 }
 function stopPlay() {
   S.playing = false; songEl.pause(); S.clips.forEach(c => { try { c.el.pause(); } catch(_){} });
