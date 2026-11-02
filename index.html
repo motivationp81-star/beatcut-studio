@@ -147,9 +147,9 @@
     <div class="checks" style="margin-top:12px">
       <label><input type="checkbox" id="fxGlitch" checked> Drop par glitch</label>
       <label><input type="checkbox" id="fxShake" checked> Beat shake</label>
-      <label><input type="checkbox" id="fxFlash"> Strong beat par flash</label>
+      <label><input type="checkbox" id="fxFlash" checked> Strong beat par flash</label>
       <label><input type="checkbox" id="fxZoom" checked> Cut par zoom punch</label>
-      <label><input type="checkbox" id="fxStickers"> Sparkle / dil stickers</label>
+      <label><input type="checkbox" id="fxStickers" checked> Sparkle / dil stickers</label>
       <label><input type="checkbox" id="fxVignette" checked> Vignette</label>
     </div>
     <label class="f">Quality</label>
@@ -226,10 +226,10 @@ const S = {
   errShown: false, audioGraph: null,
 };
 const PRESETS = {
-  funk:      { beatsPerCut: 1, shake: 1.0, zoomPunch: 0.16, grade: "contrast(1.12) saturate(1.25)", stickers: "spark" },
-  lyrics:    { beatsPerCut: 2, shake: 0.4, zoomPunch: 0.08, grade: "contrast(1.06) saturate(1.15)", stickers: "spark" },
-  dreamy:    { beatsPerCut: 4, shake: 0.15, zoomPunch: 0.03, grade: "brightness(1.05) saturate(1.3)", stickers: "love" },
-  cinematic: { beatsPerCut: 4, shake: 0.2, zoomPunch: 0.05, grade: "contrast(1.18) saturate(0.82) brightness(0.96)", stickers: "none" },
+  funk:      { beatsPerCut: 1, shake: 1.0, zoomPunch: 0.30, grade: "contrast(1.12) saturate(1.25)", stickers: "spark" },
+  lyrics:    { beatsPerCut: 2, shake: 0.4, zoomPunch: 0.16, grade: "contrast(1.06) saturate(1.15)", stickers: "spark" },
+  dreamy:    { beatsPerCut: 4, shake: 0.15, zoomPunch: 0.07, grade: "brightness(1.05) saturate(1.3)", stickers: "love" },
+  cinematic: { beatsPerCut: 4, shake: 0.2, zoomPunch: 0.10, grade: "contrast(1.18) saturate(0.82) brightness(0.96)", stickers: "none" },
 };
 function rng32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 function effPreset() {
@@ -345,17 +345,21 @@ function buildTimeline() {
     sg.zAmt = 0.6 + R() * 1.1;
     sg.rate = funky ? [1.3, 1.3, 0.8, 1.5, 1.0][Math.floor(R() * 5)] : [1, 1, 1, 0.85, 1.15][Math.floor(R() * 5)];
     sg.dir = R() < 0.5 ? -1 : 1;
+    sg.kb = R() < 0.5 ? -1 : 1;
     sg.tr = R() < 0.18 ? (R() < 0.5 ? "fade" : "slide") : "none";
   });
   const lines = $("lyrics").value.split("\n").map(x => x.trim()).filter(Boolean);
   S.wordTimes = []; S.lineTimes = [];
   const tStart = $("hookText").value.trim() ? S.t0 + 2.0 : S.t0;
   const pool = inRange.filter(b => b.t >= tStart && b.s > 0.35); const use = pool.length >= 4 ? pool : inRange.filter(b => b.t >= tStart);
-  let bi = 0;
-  lines.forEach((line, li) => {
-    if (bi < use.length) S.lineTimes.push({ line, t: use[bi].t });
-    line.split(/\s+/).filter(Boolean).forEach(w => { if (bi < use.length) { S.wordTimes.push({ word: w, t: use[bi].t, ln: li }); bi++; } });
-  });
+  let bi = 0, pass = 0;
+  while (bi < use.length && pass < 8 && lines.length) {
+    lines.forEach((line, li) => {
+      if (bi < use.length) S.lineTimes.push({ line, t: use[bi].t });
+      line.split(/\s+/).filter(Boolean).forEach(w => { if (bi < use.length) { S.wordTimes.push({ word: w, t: use[bi].t, ln: li }); bi++; } });
+    });
+    pass++;
+  }
   S.lastBeatIdx = -1; S.lastSegIdx = -1; S.particles = [];
   drawTimelineStrip();
   syncSegUI();
@@ -441,7 +445,7 @@ function drawFrame(rawT) {
   let f = P.grade + " brightness(" + M.bri + ") contrast(" + M.con + ") saturate(" + M.sat + ")" + (M.blur > 0 ? " blur(" + M.blur + "px)" : "");
   if ($("qEnhance").checked) f += " contrast(1.05) saturate(1.08)";
   try { ctx.filter = f; } catch(_){}
-  const punch = $("fxZoom").checked ? 1 + P.zoomPunch * M.zoom * (seg.mZoom != null ? seg.mZoom : (seg.zAmt || 1)) * Math.max(0, 1 - (t - seg.start) * 3.5) : 1;
+  const punch = $("fxZoom").checked ? 1 + P.zoomPunch * M.zoom * (seg.mZoom != null ? seg.mZoom : (seg.zAmt || 1)) * Math.max(0, 1 - (t - seg.start) * 1.8) : 1;
   const m = mode();
 
   if (m === "clips") {
@@ -457,8 +461,11 @@ function drawFrame(rawT) {
       let panX = 0; const trv = M.tr !== "none" ? M.tr : (seg.mTr != null ? seg.mTr : (seg.tr || "none"));
       if (trv === "slide") panX = Math.max(0, 1 - segP * 3) * 90 * (seg.dir || 1);
       if (trv === "fade") ctx.globalAlpha = Math.min(1, 0.2 + segP * 3.2);
-      drawCover(v, v.videoWidth, v.videoHeight, punch * (1 + segP * 0.05), panX);
+      drawCover(v, v.videoWidth, v.videoHeight, punch * (1 + (seg.kb > 0 ? segP : 1 - segP) * 0.15), panX);
       ctx.globalAlpha = 1;
+      try { const lc = S._lf || (S._lf = document.createElement("canvas")); if (lc.width !== canvas.width) { lc.width = canvas.width; lc.height = canvas.height; } lc.getContext("2d").drawImage(canvas, 0, 0); } catch(_){}
+    } else if (S._lf) {
+      try { ctx.drawImage(S._lf, 0, 0, W, H); } catch(_){}
     } else {
       ctx.fillStyle = "#1a2036"; ctx.fillRect(0, 0, W, H);
     }
@@ -496,12 +503,12 @@ function drawFrame(rawT) {
   }
   try { ctx.filter = "none"; } catch(_){}
 
-  const doGlitch = $("fxGlitch").checked && ((EP === "funk" && pulse > 0.42) || m === "song");
+  const doGlitch = $("fxGlitch").checked && ((EP === "funk" && pulse > 0.55) || m === "song");
   if (doGlitch) {
     const csx = canvas.width / W, csy = canvas.height / H;
-    const slices = EP === "funk" ? 7 : 4;
+    const slices = EP === "funk" ? 5 : 3;
     for (let i = 0; i < slices; i++) {
-      const gy = Math.random() * canvas.height, gh = (8 + Math.random() * 42) * csy, off = ((Math.random() - 0.5) * (EP === "funk" ? 64 : 26) * pulse + 8) * csx;
+      const gy = Math.random() * canvas.height, gh = (8 + Math.random() * 42) * csy, off = ((Math.random() - 0.5) * (EP === "funk" ? 30 : 14) * pulse + 8) * csx;
       try { ctx.drawImage(canvas, 0, gy, canvas.width, gh, off, gy, canvas.width, gh); } catch(_){}
     }
     if (EP === "funk") { ctx.fillStyle = "rgba(255,40,70," + (pulse * 0.12) + ")"; ctx.fillRect(0, 0, W, H); }
@@ -550,14 +557,17 @@ function drawText(t) {
   ctx.save(); ctx.textAlign = "center"; ctx.textBaseline = "middle";
   const hook = $("hookText").value.trim();
   const rel = t - S.t0;
-  if (hook && rel < 2.0) {
-    const a = rel < 0.2 ? rel / 0.2 : (rel > 1.6 ? Math.max(0, (2.0 - rel) / 0.4) : 1);
+  const outro = hook && rel >= 2.0 && (S.t1 - t) <= 2.0 && !currentOf(S.wordTimes, t, 0.6);
+  if (hook && (rel < 2.0 || outro)) {
+    const rem = S.t1 - t;
+    const a = outro ? Math.min(1, (2.0 - rem) / 0.25) * Math.min(1, Math.max(0, rem / 0.3)) : (rel < 0.2 ? rel / 0.2 : (rel > 1.8 ? Math.max(0, (2.0 - rel) / 0.2) : 1));
     ctx.globalAlpha = a;
-    const sc = 0.7 + 0.3 * Math.min(1, rel / 0.18);
+    const sc = outro ? 1 : 0.7 + 0.3 * Math.min(1, rel / 0.18);
     ctx.translate(W / 2, H * 0.4); ctx.scale(sc, sc);
     const size = fitFont(hook.toUpperCase(), "900", W - 70, 104);
     ctx.font = "900 " + size + "px system-ui, 'Arial Black', sans-serif";
     ctx.lineWidth = Math.max(6, size / 9); ctx.strokeStyle = "rgba(0,0,0,0.9)"; ctx.lineJoin = "round";
+    ctx.fillStyle = "rgba(0,0,0,0.38)"; ctx.fillRect(-(W - 56) / 2, -size * 0.82, W - 56, size * 1.64);
     ctx.strokeText(hook.toUpperCase(), 0, 0);
     ctx.shadowColor = "rgba(255,210,62,0.95)"; ctx.shadowBlur = 18 * glowF;
     ctx.fillStyle = "#ffd23e"; ctx.fillText(hook.toUpperCase(), 0, 0);
