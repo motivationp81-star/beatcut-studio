@@ -452,9 +452,15 @@ el("render").addEventListener("click", async () => {
               const half = Math.ceil(words.length / 2);
               rows = [words.slice(0, half).join(" "), words.slice(half).join(" ")];
             }
-            const fs = Math.round(W * 0.068), lh = fs * 1.25, cy = H * 0.8;
+            let fs = Math.round(W * 0.068);
             ctx.font = "900 " + fs + "px system-ui, 'Arial Black', sans-serif";
             let maxW = 0; rows.forEach(r => { maxW = Math.max(maxW, ctx.measureText(r).width); });
+            if (maxW > W - 40) { // long line: shrink the font until the widest row fits the frame
+              fs = Math.max(20, Math.floor(fs * (W - 40) / maxW));
+              ctx.font = "900 " + fs + "px system-ui, 'Arial Black', sans-serif";
+              maxW = 0; rows.forEach(r => { maxW = Math.max(maxW, ctx.measureText(r).width); });
+            }
+            const lh = fs * 1.25, cy = H * 0.8;
             ctx.fillStyle = "rgba(0,0,0,0.42)";
             ctx.fillRect(Math.max(6, (W - maxW) / 2 - 16), cy - lh * rows.length / 2 - 12, Math.min(W - 12, maxW + 32), lh * rows.length + 24);
             ctx.lineWidth = 9; ctx.strokeStyle = "rgba(0,0,0,0.92)"; ctx.lineJoin = "round";
