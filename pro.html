@@ -6,29 +6,56 @@
 <title>BeatCut Pro — Timeline Beat Editor</title>
 <style>
   * { box-sizing: border-box; }
-  body { background:#101216; color:#e8eaf0; font-family:system-ui, sans-serif; margin:0; padding:14px; }
-  header { display:flex; align-items:baseline; gap:14px; flex-wrap:wrap; }
-  h1 { font-size:21px; margin:2px 0; }
-  header .links { font-size:12.5px; color:#9aa3b2; }
+  html, body { height: 100%; }
+  body { background:#141414; color:#e8eaf0; font-family:system-ui, sans-serif; margin:0; padding:8px; display:flex; flex-direction:column; gap:8px; height:100vh; overflow:hidden; }
   a { color:#ffd23e; }
-  .card { background:#1a1d24; border:1px solid #2a2e3a; border-radius:10px; padding:12px; }
-  #toolbar { display:flex; flex-wrap:wrap; gap:16px; align-items:flex-end; margin-top:10px; }
+
+  /* ---------- top menu bar ---------- */
+  #menubar { display:flex; align-items:center; gap:14px; background:#2a2a2a; border:1px solid #383838; border-radius:8px; padding:0 12px; height:40px; flex:none; }
+  .appname { font-weight:800; font-size:14.5px; white-space:nowrap; }
+  .menu { display:flex; gap:2px; }
+  .mitem { background:transparent; border:0; color:#dfe4ee; font-size:13px; padding:5px 10px; cursor:pointer; border-radius:5px; }
+  .mitem:hover { background:#3a3a3a; }
+  .mitem.on { box-shadow:inset 0 -2px 0 #ffd23e; font-weight:600; }
+  .apptitle { flex:1; text-align:center; color:#9aa3b2; font-size:12.5px; white-space:nowrap; overflow:hidden; }
+  #menubar .links { font-size:12px; color:#9aa3b2; white-space:nowrap; }
+
+  /* ---------- panels ---------- */
+  #upper { flex:1; min-height:0; display:grid; grid-template-columns:300px minmax(0,1fr) 348px; gap:8px; }
+  #lower { flex:none; height:202px; display:grid; grid-template-columns:288px minmax(0,1fr); gap:8px; }
+  .panel { background:#1f1f1f; border:1px solid #333; border-radius:8px; display:flex; flex-direction:column; min-height:0; min-width:0; overflow:hidden; }
+  .ptabs { display:flex; align-items:center; gap:2px; background:#2a2a2a; padding:0 8px; height:30px; flex:none; border-bottom:1px solid #383838; }
+  .ptab { font-size:12px; color:#9aa3b2; padding:4px 8px; white-space:nowrap; }
+  .ptab.on { color:#fff; border-bottom:2px solid #ffd23e; font-weight:600; }
+  .pbody { padding:12px; overflow-y:auto; flex:1; min-height:0; }
+
+  /* ---------- form controls (carried over) ---------- */
   label.f { display:block; font-size:12px; color:#9aa3b2; margin:0 0 4px; }
-  input[type=file] { font-size:12.5px; color:#c9cfdb; max-width:230px; }
-  input[type=text], textarea, select { background:#0c0e12; color:#e8eaf0; border:1px solid #333847; border-radius:7px; padding:7px 9px; font-size:13.5px; }
+  .field { margin-bottom:11px; }
+  input[type=file] { font-size:12.5px; color:#c9cfdb; max-width:100%; width:100%; }
+  input[type=text], textarea, select { background:#121212; color:#e8eaf0; border:1px solid #3a3a3a; border-radius:7px; padding:7px 9px; font-size:13.5px; }
   textarea { width:100%; min-height:64px; resize:vertical; }
   .chips { display:flex; flex-wrap:wrap; gap:6px; }
-  .chip { background:#0c0e12; color:#e8eaf0; border:1px solid #3a4054; border-radius:999px; padding:6px 12px; cursor:pointer; font-size:13px; }
+  .chip { background:#121212; color:#e8eaf0; border:1px solid #3d4457; border-radius:999px; padding:6px 12px; cursor:pointer; font-size:13px; }
   .chip.on { background:#ffd23e; color:#111; border-color:#ffd23e; font-weight:700; }
-  button.btn { background:#232733; color:#e8eaf0; border:1px solid #3a4054; padding:9px 15px; font-weight:700; border-radius:8px; cursor:pointer; font-size:13.5px; }
+  button.btn { background:#2b2b2b; color:#e8eaf0; border:1px solid #454545; padding:9px 15px; font-weight:700; border-radius:8px; cursor:pointer; font-size:13.5px; }
+  button.btn.sm { padding:3px 10px; font-size:12px; border-radius:6px; }
   button.primary { background:#ffd23e; color:#111; border:0; padding:10px 18px; font-weight:800; border-radius:8px; cursor:pointer; font-size:14px; }
   button:disabled { opacity:.45; cursor:default; }
-  #main { display:grid; grid-template-columns:minmax(300px,400px) 1fr; gap:12px; margin-top:12px; align-items:start; }
-  #previewCard video.pv { width:100%; background:#000; border-radius:8px; display:block; }
-  #previewCard .transport { display:flex; align-items:center; gap:10px; margin-top:8px; }
-  #clock { font-size:12.5px; color:#9aa3b2; }
+  .btnrow { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+  .btnrow.big { margin-top:13px; }
+  .btnrow.big button { flex:1; }
   .note { font-size:11.5px; color:#8b93a5; margin:6px 0 0; }
-  #props h3 { font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:#9aa3b2; margin:14px 0 8px; border-bottom:1px solid #2a2e3a; padding-bottom:5px; }
+
+  /* ---------- program monitor ---------- */
+  .pbody.prog { display:flex; flex-direction:column; }
+  .pv { width:100%; background:#000; border-radius:6px; display:block; max-height:36vh; object-fit:contain; }
+  #previewCard .transport, .transport { display:flex; align-items:center; gap:12px; margin-top:9px; }
+  #clock { font-family:ui-monospace, Menlo, Consolas, monospace; font-size:15px; color:#5eb1ff; font-weight:600; white-space:nowrap; }
+  #dlArea a { display:inline-block; margin-top:10px; background:#ffd23e; color:#111; font-weight:800; padding:11px 18px; border-radius:9px; text-decoration:none; }
+
+  /* ---------- properties ---------- */
+  #props h3 { font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:#9aa3b2; margin:14px 0 8px; border-bottom:1px solid #333; padding-bottom:5px; }
   #props h3:first-child { margin-top:0; }
   .fxgrid { display:grid; grid-template-columns:1fr 1fr; gap:5px 12px; }
   label.chk { display:flex; align-items:center; gap:7px; font-size:13.5px; color:#dfe4ee; cursor:pointer; }
@@ -36,96 +63,149 @@
   .srow label { font-size:13px; color:#c9cfdb; width:118px; flex:none; }
   .srow output { font-size:12.5px; color:#ffd23e; width:44px; text-align:right; }
   input[type=range] { flex:1; accent-color:#ffd23e; }
-  .btnrow { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
   #segInfo { font-size:13px; color:#c9cfdb; min-height:18px; }
-  #timelineCard { margin-top:12px; }
-  #tlBar { display:flex; align-items:center; gap:8px; margin-bottom:8px; flex-wrap:wrap; }
-  #tlBar .hint { font-size:12px; color:#8b93a5; }
-  #tlScroll { overflow-x:auto; background:#0c0e12; border:1px solid #262b38; border-radius:8px; }
+
+  /* ---------- media bin ---------- */
+  .binCount { margin-left:auto; color:#8b93a5; font-size:11.5px; }
+  .pbody.binbody { padding:8px; }
+  #mediaList { list-style:none; margin:0; padding:0; }
+  #mediaList li { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:5px 6px; border-bottom:1px solid #2a2a2a; font-size:12px; }
+  .binname { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:#dfe4ee; }
+  .binmeta { color:#8b93a5; flex:none; font-family:ui-monospace, Menlo, monospace; font-size:11.5px; }
+  .binempty { color:#8b93a5; }
+
+  /* ---------- timeline ---------- */
+  .ptabs.tlhead { gap:6px; }
+  #tlClock { font-family:ui-monospace, Menlo, Consolas, monospace; font-size:13px; color:#5eb1ff; font-weight:600; margin-left:8px; white-space:nowrap; }
+  .tlzoom { margin-left:auto; display:flex; gap:4px; flex:none; }
+  .tlhead .hint { font-size:11px; color:#8b93a5; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #tlBody { display:flex; flex:1; min-height:0; }
+  #tlRail { flex:none; width:38px; background:#242424; border-right:1px solid #333; display:flex; flex-direction:column; align-items:center; padding-top:34px; gap:6px; }
+  .rbtn { width:28px; height:28px; background:#2e2e2e; border:1px solid #3d3d3d; color:#dfe4ee; border-radius:6px; cursor:pointer; font-size:13px; line-height:1; padding:0; }
+  .rbtn:hover { background:#3a3a3a; }
+  .rbtn.on { background:#2f6db3; border-color:#2f6db3; }
+  #tlHeads { flex:none; width:96px; background:#242424; border-right:1px solid #333; }
+  .thead { display:flex; align-items:center; gap:6px; padding:0 8px; border-bottom:1px solid #2c2c2c; font-size:11px; color:#c9cfdb; }
+  .thead.rulerhead { height:26px; }
+  .thead.vhead { height:68px; }
+  .thead.ahead { height:46px; }
+  .tchip { background:#2f6db3; color:#fff; font-weight:700; border-radius:3px; padding:2px 6px; font-size:11px; }
+  .ticons { font-size:10px; opacity:.75; }
+  .tname { color:#8b93a5; }
+  #tlScroll { flex:1; min-width:0; overflow-x:auto; overflow-y:hidden; background:#161616; }
   #tlInner { position:relative; min-width:100%; }
-  #ruler { position:relative; height:24px; color:#8b93a5; font-size:10px; cursor:pointer; border-bottom:1px solid #262b38; }
+  #ruler { position:relative; height:26px; color:#8b93a5; font-size:10px; cursor:pointer; border-bottom:1px solid #333; background:#202020; }
   #ruler .tick { position:absolute; bottom:0; width:2px; background:rgba(255,210,62,.35); pointer-events:none; }
   #ruler .tick.strong { background:rgba(255,210,62,.9); width:3px; }
-  #ruler .lab { position:absolute; top:2px; pointer-events:none; }
-  #track { position:relative; height:66px; background:#14161c; cursor:pointer; }
-  .seg { position:absolute; top:6px; height:54px; border-radius:5px; border:1px solid rgba(255,255,255,.28); font-size:10.5px; padding:3px 5px; overflow:hidden; color:#0e0f13; font-weight:700; cursor:grab; user-select:none; touch-action:none; }
+  #ruler .lab { position:absolute; top:3px; pointer-events:none; font-family:ui-monospace, Menlo, monospace; font-size:9.5px; }
+  #track { position:relative; height:68px; background:#232323; cursor:pointer; }
+  .seg { position:absolute; top:6px; height:56px; border-radius:5px; border:1px solid rgba(255,255,255,.28); font-size:10.5px; padding:3px 5px; overflow:hidden; color:#0e0f13; font-weight:700; cursor:grab; user-select:none; touch-action:none; }
   .seg.sel { outline:2px solid #ffd23e; outline-offset:-1px; }
   .seg small { display:block; font-weight:500; white-space:nowrap; }
-  .seg .hdl { position:absolute; top:0; width:8px; height:100%; cursor:ew-resize; }
+  .segnm { display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .seg.hasthumb { color:#fff; background-size:auto 100%; background-repeat:repeat-x; background-position:0 0; text-shadow:0 1px 2px rgba(0,0,0,.85); }
+  .seg.hasthumb .segnm { background:rgba(0,0,0,.45); margin:-3px -5px 1px; padding:1px 5px; }
+  .seg .hdl { position:absolute; top:0; width:8px; height:100%; cursor:ew-resize; z-index:2; }
   .seg .hdl.l { left:0; } .seg .hdl.r { right:0; }
+  #waveTrack { position:relative; height:46px; background:#191919; border-top:1px solid #2c2c2c; overflow:hidden; cursor:pointer; }
+  #waveCanvas { display:block; height:46px; width:100%; }
   #playhead { position:absolute; top:0; bottom:0; width:2px; background:#ff4757; pointer-events:none; z-index:5; }
-  #status { background:#0c0e12; border:1px solid #262b38; border-radius:8px; padding:11px; white-space:pre-wrap; min-height:52px; font-size:13px; margin-top:12px; }
-  #dlArea a { display:inline-block; margin-top:10px; background:#ffd23e; color:#111; font-weight:800; padding:11px 18px; border-radius:9px; text-decoration:none; }
-  @media (max-width: 860px) { #main { grid-template-columns:1fr; } }
+  #playhead::before { content:""; position:absolute; top:0; left:-5px; border:6px solid transparent; border-top:9px solid #ff4757; }
+
+  /* ---------- status ---------- */
+  #status { background:#1f1f1f; border:1px solid #333; border-radius:8px; padding:9px 11px; white-space:pre-wrap; min-height:38px; max-height:88px; overflow-y:auto; font-size:12.5px; flex:none; }
+
+  @media (max-width: 980px) {
+    body { height:auto; overflow:auto; }
+    #upper { grid-template-columns:1fr; }
+    #lower { grid-template-columns:1fr; height:auto; }
+    #tlBody { min-height:170px; }
+    .apptitle { display:none; }
+  }
 </style>
 </head>
 <body>
-<header>
-  <h1>🎬 BeatCut Pro</h1>
-  <span class="links">Auto beat edit + a Premiere-style timeline you can edit by hand, on the frame-exact engine. Simpler versions: <a href="studio.html">Auto editor</a> · <a href="app.html">Timeline editor</a> · <a href="old.html">Original</a></span>
-</header>
+  <div id="menubar">
+    <span class="appname">🎬 BeatCut Pro</span>
+    <nav class="menu">
+      <button class="mitem" id="menuImport">Import</button>
+      <button class="mitem on" id="menuEdit">Edit</button>
+      <button class="mitem" id="menuExport">Export</button>
+    </nav>
+    <span class="apptitle">Timeline Beat Editor</span>
+    <span class="links">Simpler versions: <a href="studio.html">Auto editor</a> · <a href="app.html">Timeline editor</a> · <a href="old.html">Original</a></span>
+  </div>
 
-<div class="card" id="toolbar">
-  <div>
-    <label class="f">Video clips (one or more)</label>
-    <input type="file" id="clips" accept="video/*" multiple>
-  </div>
-  <div>
-    <label class="f">Photos (optional — collage mode)</label>
-    <input type="file" id="photos" accept="image/*" multiple>
-  </div>
-  <div>
-    <label class="f">Song (your own audio file)</label>
-    <input type="file" id="song" accept="audio/*">
-  </div>
-  <div>
-    <label class="f">Edit style</label>
-    <div class="chips" id="presets">
-      <button class="chip on" data-preset="auto">🤖 Auto</button>
-      <button class="chip" data-preset="funk">🔥 Funk Blast</button>
-      <button class="chip" data-preset="lyrics">👑 Lyrics King</button>
-      <button class="chip" data-preset="dreamy">🌹 Dreamy Romantic</button>
-      <button class="chip" data-preset="cinematic">🎬 Cinematic</button>
-    </div>
-  </div>
-  <div>
-    <label class="f">Cut speed</label>
-    <select id="cutRate">
-      <option value="auto" selected>Auto (from style)</option>
-      <option value="1">Every beat — fastest</option>
-      <option value="2">Every 2 beats</option>
-      <option value="4">Every 4 beats — calm</option>
-      <option value="strong">Strong beats only</option>
-    </select>
-  </div>
-  <div>
-    <label class="f">Video size</label>
-    <select id="size">
-      <option value="720x1280" selected>9:16 — Reels / Shorts (720×1280)</option>
-      <option value="720x900">4:5 — Feed post (720×900)</option>
-      <option value="720x720">1:1 — Square (720×720)</option>
-      <option value="1280x720">16:9 — YouTube (1280×720)</option>
-    </select>
-  </div>
-  <div>
-    <button class="primary" id="build">⚡ AUTO EDIT</button>
-    <button class="primary" id="render" disabled>RENDER MP4</button>
-  </div>
-</div>
+  <div id="upper">
+    <section class="panel" id="sourcePanel">
+      <div class="ptabs"><span class="ptab on">Source</span><span class="ptab">Media</span></div>
+      <div class="pbody">
+        <div class="field">
+          <label class="f">Video clips (one or more)</label>
+          <input type="file" id="clips" accept="video/*" multiple>
+        </div>
+        <div class="field">
+          <label class="f">Photos (optional — collage mode)</label>
+          <input type="file" id="photos" accept="image/*" multiple>
+        </div>
+        <div class="field">
+          <label class="f">Song (your own audio file)</label>
+          <input type="file" id="song" accept="audio/*">
+        </div>
+        <div class="field">
+          <label class="f">Edit style</label>
+          <div class="chips" id="presets">
+            <button class="chip on" data-preset="auto">🤖 Auto</button>
+            <button class="chip" data-preset="funk">🔥 Funk Blast</button>
+            <button class="chip" data-preset="lyrics">👑 Lyrics King</button>
+            <button class="chip" data-preset="dreamy">🌹 Dreamy Romantic</button>
+            <button class="chip" data-preset="cinematic">🎬 Cinematic</button>
+          </div>
+        </div>
+        <div class="field">
+          <label class="f">Cut speed</label>
+          <select id="cutRate" style="width:100%">
+            <option value="auto" selected>Auto (from style)</option>
+            <option value="1">Every beat — fastest</option>
+            <option value="2">Every 2 beats</option>
+            <option value="4">Every 4 beats — calm</option>
+            <option value="strong">Strong beats only</option>
+          </select>
+        </div>
+        <div class="field">
+          <label class="f">Video size</label>
+          <select id="size" style="width:100%">
+            <option value="720x1280" selected>9:16 — Reels / Shorts (720×1280)</option>
+            <option value="720x900">4:5 — Feed post (720×900)</option>
+            <option value="720x720">1:1 — Square (720×720)</option>
+            <option value="1280x720">16:9 — YouTube (1280×720)</option>
+          </select>
+        </div>
+        <div class="btnrow big">
+          <button class="primary" id="build">⚡ AUTO EDIT</button>
+          <button class="primary" id="render" disabled>RENDER MP4</button>
+        </div>
+        <p class="note">Add clips (or photos) and a song, press AUTO EDIT to cut on the beat, fine-tune on the timeline below, then RENDER MP4.</p>
+      </div>
+    </section>
 
-<div id="main">
-  <section class="card" id="previewCard">
-    <video id="preview" class="pv" playsinline muted></video>
-    <div class="transport">
-      <button class="btn" id="playBtn">▶ Play preview</button>
-      <span id="clock">0.0s / 0.0s</span>
-    </div>
-    <p class="note">Preview is approximate (clips mode only, no effects). The rendered MP4 is frame-exact with every effect applied.</p>
-    <video id="outPlayer" class="pv" controls playsinline style="display:none;margin-top:10px"></video>
-    <div id="dlArea"></div>
-  </section>
+    <section class="panel" id="programPanel">
+      <div class="ptabs"><span class="ptab on">Program</span></div>
+      <div class="pbody prog">
+        <video id="preview" class="pv" playsinline muted></video>
+        <div class="transport">
+          <button class="btn" id="playBtn">▶ Play preview</button>
+          <span id="clock">00:00:00:00 / 00:00:00:00</span>
+        </div>
+        <p class="note">Preview is approximate (clips mode only, no effects). The rendered MP4 is frame-exact with every effect applied.</p>
+        <video id="outPlayer" class="pv" controls playsinline style="display:none;margin-top:10px"></video>
+        <div id="dlArea"></div>
+      </div>
+    </section>
 
-  <aside class="card" id="props">
+    <aside class="panel" id="propsPanel">
+      <div class="ptabs"><span class="ptab on">Properties</span><span class="ptab">Text</span></div>
+      <div class="pbody" id="props">
     <h3>Text</h3>
     <label class="f">Hook text (big text at the start — optional)</label>
     <input type="text" id="hook" placeholder="e.g. O FIRKI WALI" style="width:100%">
@@ -206,25 +286,54 @@
       <button class="btn" id="rightBtn" disabled>Move right ▶</button>
     </div>
     <p class="note">Tip: drag a part to reorder it; drag its left/right edge to trim (the neighbour stretches). Splits, trims and drags snap to the nearest beat.</p>
-  </aside>
-</div>
+  </div>
+    </aside>
+  </div>
 
-<div class="card" id="timelineCard">
-  <div id="tlBar">
-    <strong style="font-size:13px">Timeline</strong>
-    <button class="btn" id="zoomOutBtn">−</button>
-    <button class="btn" id="zoomInBtn">+</button>
-    <button class="btn" id="fitBtn">Fit</button>
-    <span class="hint">Yellow ticks on the ruler are the song's beats (tall = strong). Click the ruler or a part to move the playhead.</span>
+  <div id="lower">
+    <section class="panel" id="binPanel">
+      <div class="ptabs"><span class="ptab on">Project</span><span class="ptab">Media Bin</span><span class="binCount" id="binCount"></span></div>
+      <div class="pbody binbody">
+        <ul id="mediaList"><li class="binempty">(no media loaded)</li></ul>
+      </div>
+    </section>
+
+    <section class="panel" id="timelinePanel">
+      <div class="ptabs tlhead">
+        <span class="ptab on">Timeline</span>
+        <span class="ptab">Main Edit</span>
+        <span id="tlClock">00:00:00:00</span>
+        <span class="tlzoom">
+          <button class="btn sm" id="zoomOutBtn">−</button>
+          <button class="btn sm" id="zoomInBtn">+</button>
+          <button class="btn sm" id="fitBtn">Fit</button>
+        </span>
+        <span class="hint">Yellow ticks on the ruler are the song's beats (tall = strong). Click the ruler or a part to move the playhead.</span>
+      </div>
+      <div id="tlBody">
+        <div id="tlRail">
+          <button class="rbtn on" title="Select">➤</button>
+          <button class="rbtn" id="railSplit" title="Split at playhead">✂</button>
+          <button class="rbtn" id="railDelete" title="Delete part">🗑</button>
+          <button class="rbtn" id="railLeft" title="Move part left">◀</button>
+          <button class="rbtn" id="railRight" title="Move part right">▶</button>
+        </div>
+        <div id="tlHeads">
+          <div class="thead rulerhead"></div>
+          <div class="thead vhead"><span class="tchip">V1</span><span class="ticons">🔒 👁</span><span class="tname">Video</span></div>
+          <div class="thead ahead"><span class="tchip">A1</span><span class="ticons">🔒 👁</span><span class="tname">Song</span></div>
+        </div>
+        <div id="tlScroll">
+          <div id="tlInner">
+            <div id="ruler"></div>
+            <div id="track"></div>
+            <div id="waveTrack"><canvas id="waveCanvas" height="46"></canvas></div>
+            <div id="playhead" style="left:0"></div>
+          </div>
+        </div>
+      </div>
+    </section>
   </div>
-  <div id="tlScroll">
-    <div id="tlInner">
-      <div id="ruler"></div>
-      <div id="track"></div>
-      <div id="playhead" style="left:0"></div>
-    </div>
-  </div>
-</div>
 
 <div id="status">Engine: loading… (if this message never changes, the engine CDN could not be reached — check your connection and reload.)</div>
 
@@ -491,7 +600,7 @@ function drawTimeline() {
     const d = document.createElement("span");
     d.className = "lab";
     d.style.left = (t * S.pps + 3) + "px";
-    d.textContent = t + "s";
+    d.textContent = fmtTC(t);
     ruler.appendChild(d);
   }
   /* beat ticks */
@@ -511,8 +620,16 @@ function drawTimeline() {
     d.style.width = Math.max(3, sg.dur * S.pps - 2) + "px";
     d.style.background = COL[sg.clipIdx % COL.length];
     const fxMarks = (sg.punch ? "" : " · no punch") + (sg.fx.glitch ? " · glitch" : "") + (sg.fx.vglitch ? " · Vglitch" : "") + (sg.fx.flicker ? " · flicker" : "");
-    d.innerHTML = (S.mode === "photos" ? "Photo " : S.mode === "clips" ? "Clip " : "Visual ") + (sg.clipIdx + 1) +
-      "<small>" + sg.dur.toFixed(1) + "s" + (sg.rate !== 1 ? " · " + sg.rate.toFixed(2) + "x" : "") + fxMarks + "</small>";
+    const thumb = S.mode === "photos" ? THUMBS.photos[sg.clipIdx] : (S.mode === "clips" ? THUMBS.clips[sg.clipIdx] : null);
+    if (thumb) { d.style.backgroundImage = "url(" + thumb + ")"; d.classList.add("hasthumb"); }
+    const nmEl = document.createElement("span");
+    nmEl.className = "segnm";
+    nmEl.textContent = S.mode === "clips" ? (S.clipFiles[sg.clipIdx] ? S.clipFiles[sg.clipIdx].name : "Clip " + (sg.clipIdx + 1))
+      : S.mode === "photos" ? (S.photoFiles[sg.clipIdx] ? S.photoFiles[sg.clipIdx].name : "Photo " + (sg.clipIdx + 1)) : "Visual";
+    d.appendChild(nmEl);
+    const smEl = document.createElement("small");
+    smEl.textContent = sg.dur.toFixed(1) + "s" + (sg.rate !== 1 ? " · " + sg.rate.toFixed(2) + "x" : "") + fxMarks;
+    d.appendChild(smEl);
     if (sg.dur * S.pps > 30) {
       const hl = document.createElement("div"); hl.className = "hdl l"; hl.dataset.handle = "l"; d.appendChild(hl);
       const hr = document.createElement("div"); hr.className = "hdl r"; hr.dataset.handle = "r"; d.appendChild(hr);
@@ -520,10 +637,13 @@ function drawTimeline() {
     track.appendChild(d);
   });
   drawPlayhead();
+  drawWaveform();
+  refreshBin();
 }
 function drawPlayhead() {
   el("playhead").style.left = (S.playhead * S.pps) + "px";
-  el("clock").textContent = S.playhead.toFixed(1) + "s / " + S.DUR.toFixed(1) + "s";
+  el("clock").textContent = fmtTCF(S.playhead) + "  /  " + fmtTCF(S.DUR);
+  const tcEl = el("tlClock"); if (tcEl) tcEl.textContent = fmtTCF(S.playhead);
 }
 function select(i) { S.sel = i; drawTimeline(); syncProps(); }
 
@@ -1065,6 +1185,199 @@ catch (e) {
   statusEl.textContent = "Engine: FAILED to start — " + (e && e.message ? e.message : e) + ". Reload the page; if it keeps failing, the editor library (mediabunny) could not be loaded.";
   console.error(e);
 }
+
+/* ================= PRO LAYOUT ADDITIONS (FilmCraft-style workspace) =================
+   Display-only extras for the restructured layout: timecode helpers, segment
+   thumbnails, the A1 waveform lane, the media bin, and wiring for the menu
+   bar / timeline tool rail. No changes to beat analysis, the segment model,
+   effects, or the render pipeline. */
+const THUMBS = { clips: {}, photos: {} };
+const BINMETA = {};
+let binSig = "__none__";
+let waveBuf = null, wavePeaks = null;
+
+function fmtTC(t) {
+  t = Math.max(0, t || 0);
+  const p = (n) => String(n).padStart(2, "0");
+  return p(Math.floor(t / 3600)) + ":" + p(Math.floor((t % 3600) / 60)) + ":" + p(Math.floor(t % 60));
+}
+function fmtTCF(t) {
+  t = Math.max(0, t || 0);
+  return fmtTC(t) + ":" + String(Math.floor((t % 1) * 30)).padStart(2, "0");
+}
+function fmtDur(s) {
+  if (s == null || !isFinite(s)) return "";
+  return Math.floor(s / 60) + ":" + String(Math.floor(s % 60)).padStart(2, "0");
+}
+
+/* ---------- segment thumbnails: one frame per source clip/photo, cached as data URLs ---------- */
+async function captureThumb(file, isPhoto) {
+  try {
+    const c = document.createElement("canvas"); c.width = 96; c.height = 54;
+    const x = c.getContext("2d");
+    x.fillStyle = "#111"; x.fillRect(0, 0, 96, 54);
+    if (isPhoto) {
+      const bm = await createImageBitmap(file);
+      const sc = Math.max(96 / bm.width, 54 / bm.height);
+      x.drawImage(bm, (96 - bm.width * sc) / 2, (54 - bm.height * sc) / 2, bm.width * sc, bm.height * sc);
+      bm.close();
+    } else {
+      const url = URL.createObjectURL(file);
+      const v = document.createElement("video");
+      v.muted = true; v.playsInline = true; v.preload = "auto"; v.src = url;
+      await new Promise((res, rej) => {
+        const to = setTimeout(res, 2500);
+        v.addEventListener("loadedmetadata", () => { clearTimeout(to); res(); }, { once: true });
+        v.addEventListener("error", () => { clearTimeout(to); rej(new Error("thumb load")); }, { once: true });
+      });
+      const target = Math.min(1.2, Math.max(0.05, (v.duration || 2) * 0.15));
+      await new Promise((res) => {
+        const to = setTimeout(res, 1500);
+        v.addEventListener("seeked", () => { clearTimeout(to); res(); }, { once: true });
+        try { v.currentTime = target; } catch (_) { clearTimeout(to); res(); }
+      });
+      if (v.videoWidth > 0) {
+        const sc = Math.max(96 / v.videoWidth, 54 / v.videoHeight);
+        x.drawImage(v, (96 - v.videoWidth * sc) / 2, (54 - v.videoHeight * sc) / 2, v.videoWidth * sc, v.videoHeight * sc);
+      }
+      URL.revokeObjectURL(url);
+    }
+    return c.toDataURL("image/jpeg", 0.6);
+  } catch (e) { return null; }
+}
+function probeDur(file, key) {
+  try {
+    const u = URL.createObjectURL(file);
+    const v = document.createElement("video");
+    v.preload = "metadata"; v.src = u;
+    v.addEventListener("loadedmetadata", () => { BINMETA[key] = fmtDur(v.duration); URL.revokeObjectURL(u); refreshBin(); }, { once: true });
+  } catch (_) { /* duration just stays blank */ }
+}
+
+/* ---------- media bin (lower-left project panel) ---------- */
+function refreshBin() {
+  const list = el("mediaList"); if (!list) return;
+  const items = [];
+  S.clipFiles.forEach((f, i) => items.push({ icon: "🎬", name: f.name, meta: BINMETA["c" + i] || "video" }));
+  S.photoFiles.forEach((f) => items.push({ icon: "🖼", name: f.name, meta: "photo" }));
+  const sf = el("song").files && el("song").files[0];
+  if (sf) items.push({ icon: "🎵", name: sf.name, meta: S.songBuf ? fmtDur(S.DUR) : "song" });
+  const sig = items.map(x => x.name + "~" + x.meta).join("|");
+  if (sig === binSig) return;
+  binSig = sig;
+  list.innerHTML = "";
+  if (!items.length) {
+    const li = document.createElement("li");
+    li.className = "binempty"; li.textContent = "(no media loaded)";
+    list.appendChild(li);
+  }
+  items.forEach(it => {
+    const li = document.createElement("li");
+    const a = document.createElement("span"); a.className = "binname"; a.textContent = it.icon + "  " + it.name;
+    const b = document.createElement("span"); b.className = "binmeta"; b.textContent = it.meta;
+    li.appendChild(a); li.appendChild(b);
+    list.appendChild(li);
+  });
+  const cnt = el("binCount");
+  if (cnt) cnt.textContent = items.length ? items.length + (items.length === 1 ? " item" : " items") : "";
+}
+
+/* ---------- A1 waveform lane (peaks from the decoded song, beat grid aligned) ---------- */
+function computeWave() {
+  waveBuf = S.songBuf;
+  const N = 4096;
+  wavePeaks = new Float32Array(N * 2);
+  const d = S.songBuf.getChannelData(0);
+  const block = Math.max(1, Math.floor(d.length / N));
+  const stride = Math.max(1, Math.floor(block / 48));
+  for (let i = 0; i < N; i++) {
+    let mn = 1, mx = -1;
+    const st = i * block;
+    for (let j = 0; j < block; j += stride) {
+      const v = d[st + j];
+      if (v < mn) mn = v;
+      if (v > mx) mx = v;
+    }
+    if (mn > mx) { mn = 0; mx = 0; }
+    wavePeaks[i * 2] = mn; wavePeaks[i * 2 + 1] = mx;
+  }
+}
+function drawWaveform() {
+  const cv = el("waveCanvas"); if (!cv) return;
+  const g = cv.getContext("2d");
+  const Hh = 46;
+  if (!S.DUR || !S.songBuf) {
+    cv.width = Math.max(60, Math.round(el("tlInner").clientWidth));
+    cv.height = Hh; cv.style.width = "100%";
+    g.fillStyle = "#191919"; g.fillRect(0, 0, cv.width, Hh);
+    return;
+  }
+  if (waveBuf !== S.songBuf) computeWave();
+  const cssW = Math.max(60, Math.round(S.DUR * S.pps));
+  const cw = Math.min(cssW, 16000);
+  cv.width = cw; cv.height = Hh; cv.style.width = cssW + "px";
+  g.fillStyle = "#182018"; g.fillRect(0, 0, cw, Hh);
+  /* beat grid (same x mapping as the ruler ticks and segments) */
+  for (const b of S.beats) {
+    if (b.t > S.DUR) continue;
+    const x = (b.t / S.DUR) * cw;
+    g.fillStyle = b.s > 0.62 ? "rgba(255,210,62,.45)" : "rgba(255,210,62,.15)";
+    g.fillRect(x, 0, 1, Hh);
+  }
+  /* waveform body from min/max peaks */
+  const N = wavePeaks.length / 2, mid = Hh / 2, amp = Hh / 2 - 2;
+  g.fillStyle = "rgba(96,170,110,.8)";
+  g.beginPath();
+  for (let x = 0; x < cw; x++) {
+    const pi = Math.min(N - 1, Math.floor(x / cw * N));
+    const y = mid - wavePeaks[pi * 2 + 1] * amp;
+    if (x === 0) g.moveTo(x, y); else g.lineTo(x, y);
+  }
+  for (let x = cw - 1; x >= 0; x--) {
+    const pi = Math.min(N - 1, Math.floor(x / cw * N));
+    g.lineTo(x, mid - wavePeaks[pi * 2] * amp);
+  }
+  g.closePath(); g.fill();
+  g.fillStyle = "rgba(190,235,200,.45)"; g.fillRect(0, mid, cw, 1);
+}
+
+/* ---------- extra wiring: menu bar, tool rail, bin/thumbnail refresh, waveform scrub ---------- */
+(function initProUI() {
+  const wire = (id, target) => {
+    const b = el(id); if (!b) return;
+    b.addEventListener("click", () => { const t = el(target); if (t) t.click(); });
+  };
+  wire("railSplit", "splitBtn");
+  wire("railDelete", "delBtn");
+  wire("railLeft", "leftBtn");
+  wire("railRight", "rightBtn");
+  const mi = el("menuImport"); if (mi) mi.addEventListener("click", () => el("clips").click());
+  const me = el("menuExport"); if (me) me.addEventListener("click", () => { const r = el("render"); if (r && !r.disabled) r.click(); });
+  const md = el("menuEdit"); if (md) md.addEventListener("click", () => { const t = el("timelinePanel"); if (t) t.scrollIntoView({ block: "nearest" }); });
+  el("clips").addEventListener("change", () => {
+    THUMBS.clips = {};
+    S.clipFiles.forEach((f, i) => {
+      probeDur(f, "c" + i);
+      captureThumb(f, false).then(u => { if (u) { THUMBS.clips[i] = u; if (S.segments.length) drawTimeline(); } });
+    });
+    refreshBin();
+  });
+  el("photos").addEventListener("change", () => {
+    THUMBS.photos = {};
+    S.photoFiles.forEach((f, i) => {
+      captureThumb(f, true).then(u => { if (u) { THUMBS.photos[i] = u; if (S.segments.length) drawTimeline(); } });
+    });
+    refreshBin();
+  });
+  el("song").addEventListener("change", () => refreshBin());
+  const wt = el("waveTrack");
+  if (wt) wt.addEventListener("pointerdown", (e) => {
+    if (!S.DUR) return;
+    scrub = true; S.playhead = tlTime(e); drawPlayhead();
+  });
+  refreshBin();
+})();
+
 </script>
 </body>
 </html>
