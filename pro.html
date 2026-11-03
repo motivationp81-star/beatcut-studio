@@ -112,6 +112,21 @@
   #playhead { position:absolute; top:0; bottom:0; width:2px; background:#ff4757; pointer-events:none; z-index:5; }
   #playhead::before { content:""; position:absolute; top:0; left:-5px; border:6px solid transparent; border-top:9px solid #ff4757; }
 
+  /* ---------- fx tray (one-tap effects strip) ---------- */
+  #fxTray { flex:none; display:flex; align-items:center; gap:10px; background:#1f1f1f; border:1px solid #333; border-radius:8px; padding:8px 10px; flex-wrap:wrap; }
+  #fxTrayLabel { font-size:12.5px; color:#c9cfdb; font-weight:700; white-space:nowrap; }
+  .fxscope { display:flex; align-items:center; gap:6px; font-size:12.5px; color:#9aa3b2; white-space:nowrap; }
+  .fxscope select { padding:5px 8px; font-size:12.5px; }
+  .fxbtns { display:flex; gap:6px; flex-wrap:wrap; }
+  .fxbtn { display:flex; align-items:center; gap:7px; background:#232323; color:#dfe4ee; border:1px solid #454545; border-radius:9px; padding:9px 13px; font-size:13.5px; font-weight:700; cursor:pointer; }
+  .fxbtn:hover { background:#2e2e2e; }
+  .fxbtn.on { background:#ffd23e; color:#111; border-color:#ffd23e; }
+  .fxbtn.mix { background:#3a2f05; color:#ffd23e; border-color:#ffd23e; }
+  .fxbtn:disabled { opacity:.45; cursor:default; }
+  .fxbtn .fxst { font-size:10px; font-weight:800; letter-spacing:.06em; background:rgba(0,0,0,.25); color:#8b93a5; border-radius:99px; padding:2px 7px; }
+  .fxbtn.on .fxst { background:rgba(0,0,0,.18); color:#111; }
+  .fxbtn.mix .fxst { color:#ffd23e; }
+
   /* ---------- status ---------- */
   #status { background:#1f1f1f; border:1px solid #333; border-radius:8px; padding:9px 11px; white-space:pre-wrap; min-height:38px; max-height:88px; overflow-y:auto; font-size:12.5px; flex:none; }
 
@@ -288,6 +303,25 @@
     <p class="note">Tip: drag a part to reorder it; drag its left/right edge to trim (the neighbour stretches). Splits, trims and drags snap to the nearest beat.</p>
   </div>
     </aside>
+  </div>
+
+  <div id="fxTray">
+    <span id="fxTrayLabel">Effects — tap to apply to the selected part</span>
+    <label class="fxscope">Apply to:
+      <select id="trayScope">
+        <option value="sel" selected>Selected part</option>
+        <option value="all">All parts</option>
+      </select>
+    </label>
+    <div class="fxbtns">
+      <button class="fxbtn" id="trayShake" data-fx="shake">📳 Shake <span class="fxst">OFF</span></button>
+      <button class="fxbtn" id="trayFlash" data-fx="flash">⚡ Beat Flash <span class="fxst">OFF</span></button>
+      <button class="fxbtn" id="trayGlitch" data-fx="glitch">🌀 Glitch Slices <span class="fxst">OFF</span></button>
+      <button class="fxbtn" id="trayVglitch" data-fx="vglitch">↕️ Vertical Glitch <span class="fxst">OFF</span></button>
+      <button class="fxbtn" id="trayFlicker" data-fx="flicker">✨ Flicker <span class="fxst">OFF</span></button>
+      <button class="fxbtn" id="trayPunch" data-fx="punch">🎯 Zoom Punch <span class="fxst">OFF</span></button>
+      <button class="fxbtn" id="traySpeed" data-fx="speed">⏩ Speed <span class="fxst">1.00x</span></button>
+    </div>
   </div>
 
   <div id="lower">
@@ -756,6 +790,7 @@ function syncProps() {
   const on = S.sel >= 0 && !!S.segments[S.sel];
   ["spdRange", "zoomRange", "fxPunch", "fxShake", "fxFlash", "fxGlitch", "fxVglitch", "fxFlicker", "splitBtn", "delBtn", "leftBtn", "rightBtn"]
     .forEach(id => { el(id).disabled = !on; });
+  if (typeof syncFxTray === "function") syncFxTray();
   const info = el("segInfo");
   if (!on) {
     info.textContent = S.segments.length ? S.segments.length + " parts — click a part to select it." : "No edit yet — add a song and press AUTO EDIT.";
@@ -1376,6 +1411,118 @@ function drawWaveform() {
     scrub = true; S.playhead = tlTime(e); drawPlayhead();
   });
   refreshBin();
+})();
+
+/* ================= FX TRAY (CapCut-style one-tap effects) =================
+   A second face on the SAME per-part controls, in the strip under the upper
+   panels. In "Selected part" mode a tap flips the matching Properties
+   checkbox and dispatches its change event, so the existing checkbox
+   handlers stay the only writers of the segment flags (the Speed button
+   likewise drives the existing speed slider). In "All parts" mode a tap
+   writes that same flag / rate on every segment directly, then refreshes
+   Properties via syncProps(). The segment model has no per-part ramp flag
+   (the funk ramp only sets `rate` at AUTO EDIT time), so the speed button
+   cycles rate 1x -> 1.25x -> 0.9x -> 1x and is labelled "Speed".
+   Sync: syncFxTray() repaints the tray from the segment flags. It runs from
+   a one-line hook in syncProps() (selection change, AUTO EDIT, split,
+   delete, move, drag) and from extra change listeners on the six fx
+   checkboxes and the speed slider, so tray <-> Properties stay in sync
+   both ways. */
+const TRAY_FX = [
+  ["trayShake", "shake"], ["trayFlash", "flash"], ["trayGlitch", "glitch"],
+  ["trayVglitch", "vglitch"], ["trayFlicker", "flicker"], ["trayPunch", "punch"],
+];
+const TRAY_CB = { punch: "fxPunch", shake: "fxShake", flash: "fxFlash", glitch: "fxGlitch", vglitch: "fxVglitch", flicker: "fxFlicker" };
+let trayMode = "sel";
+
+function trayFlag(sg, key) { return key === "punch" ? !!sg.punch : !!sg.fx[key]; }
+function traySetFlag(sg, key, v) { if (key === "punch") sg.punch = v; else sg.fx[key] = v; }
+function trayNextRate(r) {
+  if (Math.abs(r - 1) < 0.001) return 1.25;
+  if (Math.abs(r - 1.25) < 0.001) return 0.9;
+  return 1;
+}
+function syncFxTray() {
+  const tray = el("fxTray"); if (!tray) return;
+  const segs = S.segments;
+  const hasSel = S.sel >= 0 && !!segs[S.sel];
+  const all = trayMode === "all";
+  const lab = el("fxTrayLabel");
+  if (lab) lab.textContent = all ? "Effects — tap to apply to all parts" : "Effects — tap to apply to the selected part";
+  TRAY_FX.forEach(([id, key]) => {
+    const b = el(id); if (!b) return;
+    let state = false; /* true = on, false = off, "mix" = some parts (All parts mode) */
+    if (all) {
+      b.disabled = !segs.length;
+      if (segs.length) {
+        const n = segs.filter(sg => trayFlag(sg, key)).length;
+        state = n === segs.length ? true : (n === 0 ? false : "mix");
+      }
+    } else {
+      b.disabled = !hasSel;
+      if (hasSel) state = trayFlag(segs[S.sel], key);
+    }
+    b.classList.toggle("on", state === true);
+    b.classList.toggle("mix", state === "mix");
+    const st = b.querySelector(".fxst");
+    if (st) st.textContent = state === true ? "ON" : state === "mix" ? "SOME" : "OFF";
+  });
+  const sb = el("traySpeed");
+  if (sb) {
+    const st = sb.querySelector(".fxst");
+    let rate = null, mixed = false;
+    if (all) {
+      sb.disabled = !segs.length;
+      if (segs.length) {
+        rate = segs[0].rate;
+        mixed = segs.some(sg => Math.abs(sg.rate - rate) > 0.001);
+      }
+    } else {
+      sb.disabled = !hasSel;
+      if (hasSel) rate = segs[S.sel].rate;
+    }
+    sb.classList.toggle("on", rate !== null && !mixed && Math.abs(rate - 1) > 0.001);
+    sb.classList.toggle("mix", mixed);
+    if (st) st.textContent = rate === null ? "1.00x" : mixed ? "mixed" : rate.toFixed(2) + "x";
+  }
+}
+function trayApplyFx(key) {
+  const segs = S.segments;
+  if (trayMode === "all") {
+    if (!segs.length) return;
+    const target = !segs.every(sg => trayFlag(sg, key));
+    segs.forEach(sg => traySetFlag(sg, key, target));
+    drawTimeline(); syncProps(); syncFxTray();
+    return;
+  }
+  if (S.sel < 0 || !segs[S.sel]) return;
+  const cb = el(TRAY_CB[key]); if (!cb || cb.disabled) return;
+  cb.checked = !cb.checked;
+  cb.dispatchEvent(new Event("change"));
+}
+function trayCycleSpeed() {
+  const segs = S.segments;
+  if (trayMode === "all") {
+    if (!segs.length) return;
+    const base = (S.sel >= 0 && segs[S.sel]) ? segs[S.sel].rate : segs[0].rate;
+    const nr = trayNextRate(base);
+    segs.forEach(sg => { sg.rate = nr; });
+    retile(); drawTimeline(); syncProps(); syncFxTray();
+    return;
+  }
+  if (S.sel < 0 || !segs[S.sel]) return;
+  const r = el("spdRange"); if (!r || r.disabled) return;
+  r.value = trayNextRate(segs[S.sel].rate);
+  r.dispatchEvent(new Event("input"));
+  r.dispatchEvent(new Event("change"));
+}
+(function initFxTray() {
+  TRAY_FX.forEach(([id, key]) => { const b = el(id); if (b) b.addEventListener("click", () => trayApplyFx(key)); });
+  const sb = el("traySpeed"); if (sb) sb.addEventListener("click", trayCycleSpeed);
+  const sc = el("trayScope"); if (sc) sc.addEventListener("change", () => { trayMode = sc.value; syncFxTray(); });
+  Object.values(TRAY_CB).forEach(id => { const c = el(id); if (c) c.addEventListener("change", () => syncFxTray()); });
+  const sr = el("spdRange"); if (sr) sr.addEventListener("change", () => syncFxTray());
+  syncFxTray();
 })();
 
 </script>
